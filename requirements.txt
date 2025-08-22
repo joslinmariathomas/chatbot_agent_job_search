@@ -1,0 +1,17 @@
+langgraph
+langchain-google-genai
+langchain
+langchain_core
+langchain_ollama
+langsmith
+beautifulsoup4
+cloudscraper
+datetime
+pandas
+black
+flake8
+datetime
+cloudscraper
+sentence_transformers
+qdrant-client
+pytest
