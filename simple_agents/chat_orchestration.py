@@ -6,11 +6,6 @@ from enum import Enum
 from tqdm import tqdm
 
 from utils.feature_extractor.extract_job_details import JobRequirementsExtractor
-from utils.json_schema_references.chatbot_schemas import (
-    QueryType,
-    JobPosition,
-    Location,
-)
 from utils.llm_client.llm_interaction import LLMInteraction
 from utils.locanto_scraper.locanto_scraper import LocantoScraper
 from utils.vector_storage.qdrant_storage import QdrantStorage
@@ -101,7 +96,6 @@ class ChatbotOrchestrator:
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             json_key="query_type",
-            json_schema_reference=QueryType,
         )
         return query_type
 
@@ -125,7 +119,6 @@ class ChatbotOrchestrator:
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             json_key="job_position",
-            json_schema_reference=JobPosition,
         )
         return job_position
 
@@ -147,7 +140,6 @@ class ChatbotOrchestrator:
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             json_key="location",
-            json_schema_reference=Location,
         )
         return location
 

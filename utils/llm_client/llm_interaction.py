@@ -16,7 +16,6 @@ class LLMInteraction:
         system_prompt: str,
         user_prompt: str,
         json_key: str,
-        json_schema_reference: Type[BaseModel],
     ) -> str:
         enhanced_system_prompt = f"""
                 {system_prompt}
