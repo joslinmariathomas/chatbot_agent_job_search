@@ -1,9 +1,12 @@
 import datetime as dt
+import logging
 from dataclasses import dataclass
 
 import cloudscraper
 from bs4 import BeautifulSoup
 from typing import Optional
+
+from tqdm import tqdm
 
 from utils.locanto_scraper.config import (
     WEBSITE_TO_SCRAPE,
@@ -33,8 +36,8 @@ class Joblisting:
 class LocantoScraper:
     def __init__(
         self,
-        job_to_search: str,
-        location: str,
+        job_to_search: str = DEFAULT_JOB_TO_SEARCH,
+        location: str = DEFAULT_LOCATION,
     ):
         self.base_url = WEBSITE_TO_SCRAPE
         self.job_to_search = job_to_search.replace(" ", "+")
@@ -44,7 +47,10 @@ class LocantoScraper:
         self.job_listings = []
 
     def scrape(self):
-        for page_index in range(self.no_of_pages_to_scrape):
+        logging.info("Scraping locanto job listings...")
+        for page_index in tqdm(
+            range(self.no_of_pages_to_scrape), desc="Scraping pages", ncols=100
+        ):
             url = f"{self.url}&page={page_index}"
             self.get_ads_from_a_single_page(url=url)
 
@@ -56,6 +62,7 @@ class LocantoScraper:
 
     def get_ads_from_a_single_page(self, url: str):
         """Collects ad details from all listings on a single search result page."""
+        logging.info(f"Collecting ad details of {url}")
         soup = self.get_soup(url=url)
         ad_html_list = self.get_individual_ads_html(soup=soup)
         for ad_html in ad_html_list:
@@ -98,4 +105,3 @@ class LocantoScraper:
         if html_dict:
             html_dict["extraction_date"] = dt.datetime.now().astimezone().date()
         return html_dict
-

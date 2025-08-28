@@ -9,4 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 ENV ENVIRONMENT=docker
-CMD ["python", "main.py"]
+
+# Streamlit runs on port 8501 by default
+CMD ["streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]

@@ -20,7 +20,6 @@ ITEMS_TO_SCRAPE = [
     "description",
     "suburb",
     "posted_date",
-    "salary",
 ]
 ITEM_HTML_TAG_MAPPING = {
     "id": "a",
@@ -29,7 +28,6 @@ ITEM_HTML_TAG_MAPPING = {
     "description": "div",
     "suburb": "span",
     "posted_date": "div",
-    "salary": "div",
 }
 
 ID_VALUE_LIST = ["id"]
@@ -38,7 +36,6 @@ CLASS_VALUE_LIST = [
     "Company name",
     "description",
     "posted_date",
-    "salary",
 ]
 ITEMPROP_LIST = ["suburb"]
 ITEM_HTML_ATTRIBUTE_MAPPING = {
@@ -46,7 +43,6 @@ ITEM_HTML_ATTRIBUTE_MAPPING = {
     "Job position": "vap_user_content__feature_element",
     "description": "vap__description",
     "suburb": "addressLocality",
-    "salary": "vap_user_content__price",
     "Company name": "vap_user_content__feature_element",
 }
 SEARCH_STRATEGIES = {
@@ -62,6 +58,5 @@ ITEM_SEARCH_STRATEGY = {
     "description": "class",
     "suburb": "itemprop",
     "posted_date": "class",
-    "salary": "class",
     "Company name": "list",
 }

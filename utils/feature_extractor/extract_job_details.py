@@ -64,6 +64,7 @@ class JobRequirementsExtractor:
 
         except json.JSONDecodeError:
             return {}
+
     @staticmethod
     def _clean_extracted_data(data: Dict) -> Dict:
         """Clean and normalize extracted data"""
@@ -78,23 +79,7 @@ class JobRequirementsExtractor:
                             cleaned_list.append(normalized_item)
                 cleaned[key] = cleaned_list
             else:
-                cleaned[key] = value.strip() if value else None
-
-        # Merge similar categories
-        all_tech_skills = cleaned.get("technologies", [])
-        # Add technology mapping for common variations
-        tech_mapping = {
-            "Ml": "Machine Learning",
-            "Ai": "Artificial Intelligence",
-            "Js": "JavaScript",
-            "Css": "CSS",
-            "Html": "HTML",
-        }
-
-        normalized_tech = []
-        for tech in all_tech_skills:
-            normalized_tech.append(tech_mapping.get(tech, tech))
-
-        cleaned["all_technologies"] = list(set(normalized_tech))
+                if value is not None and type(value) in [str]:
+                    cleaned[key] = value.strip()
 
         return cleaned

@@ -12,6 +12,4 @@ def test_locanto_scraper():
     scraper.scrape()
     job_listings = scraper.job_listings
     assert len(job_listings) > 10
-    assert type(job_listings[0])==dict
-
-
+    assert type(job_listings[0]) == dict
