@@ -69,9 +69,11 @@ class ChatbotOrchestrator:
             job_position = self.identify_job_name(user_message)
             self.scrape_jobs_and_save_them(job_position=job_position, location=location)
         if EnumeratedQueryType(query_type) == EnumeratedQueryType.GENERAL_CHAT:
-            general_chat = ("Hello! I specialize in providing job search assistance and career-related support."
-                            " While I'd love to chat about other topics, I'm best equipped to help you with things "
-                            "like job applications, and career planning. Is there anything job-related I can help you with?")
+            general_chat = (
+                "Hello! I specialize in providing job search assistance and career-related support."
+                " While I'd love to chat about other topics, I'm best equipped to help you with things "
+                "like job applications, and career planning. Is there anything job-related I can help you with?"
+            )
             return general_chat
         return "I will get back to you as soon as possible."
 
