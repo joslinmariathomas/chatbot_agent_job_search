@@ -44,7 +44,7 @@ ITEM_HTML_ATTRIBUTE_MAPPING = {
     "description": "vap__description",
     "suburb": "addressLocality",
     "Company name": "vap_user_content__feature_element",
-    "posted_date":"vap_user_content__date_label"
+    "posted_date": "vap_user_content__date_label",
 }
 SEARCH_STRATEGIES = {
     "id": find_by_id,

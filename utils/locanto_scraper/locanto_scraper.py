@@ -1,4 +1,3 @@
-import datetime as dt
 import logging
 from dataclasses import dataclass
 
@@ -105,5 +104,5 @@ class LocantoScraper:
             except Exception as e:
                 print(f"[Not OK] {item}")
         if html_dict:
-            html_dict["extraction_date"] = dt.datetime.now().astimezone().date()
+            html_dict["url"] = url
         return html_dict

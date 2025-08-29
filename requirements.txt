@@ -18,3 +18,4 @@ pytest
 pydantic
 tqdm
 streamlit
+asyncio

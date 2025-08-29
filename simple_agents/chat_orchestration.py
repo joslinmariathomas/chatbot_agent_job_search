@@ -1,11 +1,14 @@
+import asyncio
 import logging
-from typing import Dict, List
+import threading
+from typing import Dict, List, Any
 from dataclasses import dataclass
 from enum import Enum
 
 from tqdm import tqdm
 
 from default_prompt_responses import general_chat_response, feature_not_added
+from simple_agents.config.config import recent_postings, keys_to_display_jobs
 from simple_agents.config.system_prompts import (
     system_prompt_to_identify_query_type,
     system_prompt_to_identify_job,
@@ -73,8 +76,11 @@ class ChatbotOrchestrator:
         if EnumeratedQueryType(query_type) == EnumeratedQueryType.JOB_SEARCH:
             location = self.identify_location(user_message)
             job_position = self.identify_job_name(user_message)
-            self.scrape_jobs_and_save_them(job_position=job_position, location=location)
-            return "Jobs have been saved"
+            job_search_update = self.scrape_jobs_and_save_them(
+                job_position=job_position, location=location
+            )
+            self.conversation_history.append(user_message)
+            return job_search_update
         if EnumeratedQueryType(query_type) == EnumeratedQueryType.GENERAL_CHAT:
             general_chat = general_chat_response
             return general_chat
@@ -84,7 +90,7 @@ class ChatbotOrchestrator:
     def identify_user_query_type(self, user_query: str):
         """ "Identifies user query type - if user wants to scrape jobs
         or wants to retrieve details of the job or a general chat"""
-        user_prompt = f"""{user_prompt_to_identify_query_type} {user_query}
+        user_prompt = f"""<{user_prompt_to_identify_query_type}{user_query}>
         """
 
         query_type = self.llm_client.ask_llm(
@@ -125,39 +131,38 @@ class ChatbotOrchestrator:
         self,
         job_position: str,
         location: str,
-    ):
+    ) -> Any:
         """Identify the job details, and scrape them."""
         logging.info("Extracting location and job details")
         self.scraper.job_to_search = job_position.lower().replace(" ", "+")
         self.scraper.location = location.lower()
         self.scraper.scrape()
-        scraped_jobs = self.scraper.job_listings
-        self.extract_features_and_save_in_qdrant(
-            job_listings=scraped_jobs, job_position=job_position, location=location
-        )
+        display_job_list = self.retrieve_latest_jobs()
 
-    def extract_features_and_save_in_qdrant(
+        def run_async_task():
+            try:
+                asyncio.run(
+                    self.extract_features_and_save_in_qdrant(
+                        job_listings=self.scraper.job_listings,
+                        job_position=job_position,
+                        location=location,
+                    )
+                )
+            except Exception as e:
+                logging.error(f"Background feature extraction failed: {e}")
+
+        threading.Thread(target=run_async_task, daemon=True).start()
+        return display_job_list
+
+    async def extract_features_and_save_in_qdrant(
         self, job_listings: list, job_position: str, location: str
     ):
-
-        jobs_features_extracted_list = []
-        for i in tqdm(
-            range(len(job_listings)),
-            desc="Extracting features from job listings",
-            ncols=100,
-        ):
-            job_listing = job_listings[i]
-            job_key_fields_extracted = self.feature_extractor.extract_requirements(
-                job_description=job_listing["description"]
+        try:
+            await self.extract_features(
+                job_listings=job_listings, job_position=job_position, location=location
             )
-            combined_job_details_dict = {**job_listing, **job_key_fields_extracted}
-            jobs_features_extracted_list.append(combined_job_details_dict)
-        if jobs_features_extracted_list:
-            self.save_to_qdrant(
-                job_listings=jobs_features_extracted_list,
-                job_position=job_position,
-                location=location,
-            )
+        except Exception as e:
+            logging.error(f"Background job failed: {e}")
 
     def save_to_qdrant(
         self,
@@ -172,4 +177,33 @@ class ChatbotOrchestrator:
             points=job_listings, key_to_encode="description"
         )
 
+    async def extract_features(
+        self, job_listings: list, job_position: str, location: str
+    ):
+        jobs_features_extracted_list = []
+        for i in tqdm(
+            range(len(job_listings)),
+            desc="Extracting features from job listings",
+            ncols=100,
+        ):
+            job_listing = job_listings[i]
+            job_key_fields_extracted = self.feature_extractor.extract_requirements(
+                job_description=job_listing["description"]
+            )
+            combined_job_details_dict = {**job_listing, **job_key_fields_extracted}
+            jobs_features_extracted_list.append(combined_job_details_dict)
+        if jobs_features_extracted_list:
+            if jobs_features_extracted_list:
+                self.save_to_qdrant(
+                    job_listings=jobs_features_extracted_list,
+                    job_position=job_position,
+                    location=location,
+                )
 
+    def retrieve_latest_jobs(self) -> list:
+        job_list_to_display = [
+            {key: item[key] for key in keys_to_display_jobs}
+            for item in self.scraper.job_listings
+            if item["posted_date"].strip() in recent_postings
+        ]
+        return job_list_to_display

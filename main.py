@@ -1,6 +1,7 @@
 import streamlit as st
 
 from simple_agents.chat_orchestration import ChatbotOrchestrator
+from format_streamlit_responses.job_listing_format import display_jobs_interactive
 from utils.feature_extractor.extract_job_details import JobRequirementsExtractor
 from utils.llm_client.llm_interaction import LLMInteraction
 from utils.locanto_scraper.locanto_scraper import LocantoScraper
@@ -40,6 +41,17 @@ if prompt := st.chat_input("I am an expert in job search. Let's get started!"):
     # Get agent response
     with st.chat_message("assistant"):
         agent = init_agent()
-        response = agent.start_chat(prompt)  # Replace with your agent's method
-        st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+        response = agent.start_chat(prompt)
+        if isinstance(response, list):
+            text_response = "Here are the latest jobs posted in the past week:"
+            st.markdown(text_response)
+            display_jobs_interactive(response)
+            st.session_state.messages.append(
+                {"role": "assistant", "content": text_response, "jobs_data": response}
+            )
+            st.markdown(
+                "👉 If you upload your resume, I can filter and show you jobs that best match your skills and experience."
+            )
+        else:
+            st.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
