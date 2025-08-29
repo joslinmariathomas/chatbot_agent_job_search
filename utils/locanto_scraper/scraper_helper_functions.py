@@ -47,5 +47,4 @@ def cleanup_html_tag(item: str, html_retrieved_value: Tag) -> str:
     html_retrieved_value = (
         html_retrieved_value.get_text(strip=True) if html_retrieved_value else ""
     )
-
     return html_retrieved_value
