@@ -7,6 +7,9 @@ def find_by_id(soup: BeautifulSoup, tag: str, value: str | None):
 
 
 def find_by_class(soup: BeautifulSoup, tag: str, value: str | None):
+    if value == "vap_user_content__date_label":
+        span = soup.find(name=tag, class_=value)
+        return span.next_sibling
     return soup.find(name=tag, class_=value)
 
 
@@ -39,14 +42,10 @@ def cleanup_html_tag(item: str, html_retrieved_value: Tag) -> str:
         return ""
     if item == "price" and html_retrieved_value:
         html_retrieved_value = html_retrieved_value.find("div")
-    if item == "posting_date":
-        retrieved_value = (
-            html_retrieved_value.get_text(" ", strip=True)
-            .replace("Posted:", "")
-            .strip()
-        )
-        return retrieved_value
+    if item == "posted_date":
+        return html_retrieved_value
     html_retrieved_value = (
         html_retrieved_value.get_text(strip=True) if html_retrieved_value else ""
     )
+
     return html_retrieved_value

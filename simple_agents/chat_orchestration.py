@@ -6,12 +6,12 @@ from enum import Enum
 from tqdm import tqdm
 
 from default_prompt_responses import general_chat_response, feature_not_added
-from simple_agents.system_prompts import (
+from simple_agents.config.system_prompts import (
     system_prompt_to_identify_query_type,
     system_prompt_to_identify_job,
     system_prompt_to_identify_location,
 )
-from simple_agents.user_prompts import (
+from simple_agents.config.user_prompts import (
     user_prompt_to_identify_query_type,
     user_prompt_to_identify_job,
     user_prompt_to_identify_location,
@@ -171,3 +171,5 @@ class ChatbotOrchestrator:
         self.vector_storage.upload_points(
             points=job_listings, key_to_encode="description"
         )
+
+

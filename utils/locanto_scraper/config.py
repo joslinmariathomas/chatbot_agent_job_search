@@ -27,7 +27,7 @@ ITEM_HTML_TAG_MAPPING = {
     "Company name": "li",
     "description": "div",
     "suburb": "span",
-    "posted_date": "div",
+    "posted_date": "span",
 }
 
 ID_VALUE_LIST = ["id"]
@@ -44,6 +44,7 @@ ITEM_HTML_ATTRIBUTE_MAPPING = {
     "description": "vap__description",
     "suburb": "addressLocality",
     "Company name": "vap_user_content__feature_element",
+    "posted_date":"vap_user_content__date_label"
 }
 SEARCH_STRATEGIES = {
     "id": find_by_id,
