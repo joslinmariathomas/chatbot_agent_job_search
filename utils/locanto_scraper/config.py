@@ -11,14 +11,14 @@ from utils.locanto_scraper.scraper_helper_functions import (
 )
 
 WEBSITE_TO_SCRAPE = "https://www.locanto.com.au/"
-DEFAULT_JOB_TO_SEARCH = "Data Scientist"
-DEFAULT_LOCATION = "Melbourne"
+DEFAULT_JOB_TO_SEARCH = "data scientist"
+DEFAULT_LOCATION = "melbourne"
 ITEMS_TO_SCRAPE = [
+    "suburb",
     "id",
     "Job position",
     "Company name",
     "description",
-    "suburb",
     "posted_date",
 ]
 ITEM_HTML_TAG_MAPPING = {

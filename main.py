@@ -19,7 +19,7 @@ def init_agent():
 
 
 # Streamlit UI
-st.title("AI Chatbot")
+st.title("Job Search Chatbot")
 
 # Initialize session state
 if "messages" not in st.session_state:

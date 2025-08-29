@@ -40,18 +40,18 @@ class LocantoScraper:
         location: str = DEFAULT_LOCATION,
     ):
         self.base_url = WEBSITE_TO_SCRAPE
-        self.job_to_search = job_to_search.replace(" ", "+")
-        self.location = location
-        self.url = f"{self.base_url}{self.location}/q/?query={self.job_to_search}"
+        self.job_to_search = job_to_search.lower().replace(" ", "+")
+        self.location = location.lower()
         self.no_of_pages_to_scrape = 1
         self.job_listings = []
 
     def scrape(self):
         logging.info("Scraping locanto job listings...")
+        url = f"{self.base_url}{self.location}/q/?query={self.job_to_search}"
         for page_index in tqdm(
             range(self.no_of_pages_to_scrape), desc="Scraping pages", ncols=100
         ):
-            url = f"{self.url}&page={page_index}"
+            url = f"{url}&page={page_index}"
             self.get_ads_from_a_single_page(url=url)
 
     @staticmethod
@@ -64,10 +64,12 @@ class LocantoScraper:
         """Collects ad details from all listings on a single search result page."""
         logging.info(f"Collecting ad details of {url}")
         soup = self.get_soup(url=url)
+        print(f"[+] Checking ads in: {url}")
         ad_html_list = self.get_individual_ads_html(soup=soup)
         for ad_html in ad_html_list:
             ad_detail_dict = self.parse_ad_detail(ad_html)
-            self.job_listings.append(ad_detail_dict)
+            if ad_detail_dict:
+                self.job_listings.append(ad_detail_dict)
 
     @staticmethod
     def get_individual_ads_html(soup: BeautifulSoup) -> list[str]:

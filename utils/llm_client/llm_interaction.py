@@ -1,10 +1,7 @@
 import json
-from typing import Type
 import re
-from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_ollama import OllamaLLM
-from pydantic import BaseModel
 
 
 class LLMInteraction:
@@ -41,9 +38,9 @@ class LLMInteraction:
         """Extract JSON from LLM response, handling various formats"""
         # Strip whitespace
         response = response.strip()
-        json_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", response)
+        json_match = bool(re.search(r"[`\n]", response))
         if json_match:
-            json_match = json_match.group(1).strip()
+            json_match = response.replace("`", "").replace("\n", "")
             try:
                 response = json.loads(json_match)
                 return response

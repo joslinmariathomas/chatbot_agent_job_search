@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Optional
 
@@ -18,13 +19,19 @@ class QdrantStorage:
         self.encoder = SentenceTransformer(sentence_transformer_model)
 
     def create_collection(self):
-        self.client.create_collection(
-            collection_name=self.collection_name,
-            vectors_config=models.VectorParams(
-                size=self.encoder.get_sentence_embedding_dimension(),
-                distance=models.Distance.COSINE,
-            ),
+        check_collection_exists = self.client.collection_exists(
+            collection_name=self.collection_name
         )
+        logging.info(f"Collection {self.collection_name} exists")
+        if not check_collection_exists:
+            logging.info(f"Creating collection {self.collection_name}")
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=models.VectorParams(
+                    size=self.encoder.get_sentence_embedding_dimension(),
+                    distance=models.Distance.COSINE,
+                ),
+            )
 
     def upload_points(
         self,

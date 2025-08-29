@@ -58,28 +58,44 @@ class JobRequirementsExtractor:
 
         try:
             extracted_data = json.loads(response)
-            cleaned_data = self._clean_extracted_data(extracted_data)
+            cleaned_data = self.clean_extracted_data(extracted_data)
 
             return cleaned_data
 
         except json.JSONDecodeError:
             return {}
 
-    @staticmethod
-    def _clean_extracted_data(data: Dict) -> Dict:
+    def clean_extracted_data(self, data: Dict) -> Dict:
         """Clean and normalize extracted data"""
         cleaned = {}
         for key, value in data.items():
             if isinstance(value, list):
                 cleaned_list = []
                 for item in value:
-                    if item and item.strip():
-                        normalized_item = item.strip().title()
-                        if normalized_item not in cleaned_list:
-                            cleaned_list.append(normalized_item)
+                    if item:
+                        string_items = self.flatten_strings(item=item)
+                        for string_item in string_items:
+                            normalized_item = string_item.strip().title()
+                            if normalized_item and normalized_item not in cleaned_list:
+                                cleaned_list.append(normalized_item)
                 cleaned[key] = cleaned_list
             else:
                 if value is not None and type(value) in [str]:
                     cleaned[key] = value.strip()
 
         return cleaned
+
+    def flatten_strings(self, item):
+        """Flatten nested structures and return only strings"""
+        strings = []
+
+        if isinstance(item, str):
+            strings.append(item)
+        elif isinstance(item, list):
+            for sub_item in item:
+                strings.extend(self.flatten_strings(sub_item))
+        elif isinstance(item, dict):
+            for value in item.values():
+                strings.extend(self.flatten_strings(value))
+
+        return strings
