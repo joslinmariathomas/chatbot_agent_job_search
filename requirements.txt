@@ -20,3 +20,5 @@ tqdm
 streamlit
 asyncio
 docling
+kafka-python
+confluent-kafka
