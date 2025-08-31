@@ -43,7 +43,10 @@ def cleanup_html_tag(item: str, html_retrieved_value: Tag) -> str:
     if item == "price" and html_retrieved_value:
         html_retrieved_value = html_retrieved_value.find("div")
     if item == "posted_date":
-        return html_retrieved_value
+        if html_retrieved_value:
+            return html_retrieved_value
+        else:
+            return "no_date"
     html_retrieved_value = (
         html_retrieved_value.get_text(strip=True) if html_retrieved_value else ""
     )

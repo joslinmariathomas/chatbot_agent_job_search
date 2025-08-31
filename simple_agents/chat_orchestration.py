@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import threading
-from typing import Dict, List, Any
+from typing import Dict, List, Any, BinaryIO
 from dataclasses import dataclass
 from enum import Enum
 
@@ -22,6 +22,7 @@ from simple_agents.config.user_prompts import (
 from utils.feature_extractor.extract_job_details import JobRequirementsExtractor
 from utils.llm_client.llm_interaction import LLMInteraction
 from utils.locanto_scraper.locanto_scraper import LocantoScraper
+from utils.resume_extractor.resume_parser import CVParser
 from utils.vector_storage.qdrant_storage import QdrantStorage
 
 
@@ -62,12 +63,14 @@ class ChatbotOrchestrator:
         feature_extractor: JobRequirementsExtractor,
         vector_storage: QdrantStorage,
         llm_client: LLMInteraction,
+        resume_parser: CVParser,
     ):
         self.scraper = scraper
         self.feature_extractor = feature_extractor
         self.vector_storage = vector_storage
         self.llm_client = llm_client
         self.conversation_history = []
+        self.resume_parser = resume_parser
 
     def start_chat(self, user_message: str) -> str | None:
         """"""
@@ -204,6 +207,9 @@ class ChatbotOrchestrator:
         job_list_to_display = [
             {key: item[key] for key in keys_to_display_jobs}
             for item in self.scraper.job_listings
-            if item["posted_date"].strip() in recent_postings
+            if item.get("posted_date", "No date").strip() in recent_postings
         ]
         return job_list_to_display
+
+    def parse_resume(self, resume_pdf: BinaryIO):
+        self.resume_parser.parse_resume(resume_pdf=resume_pdf)
