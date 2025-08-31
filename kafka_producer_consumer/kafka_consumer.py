@@ -11,12 +11,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def consume_kafka_messages(processor: AbstractMessageProcessor):
+def consume_kafka_messages(
+    processor: AbstractMessageProcessor, bootstrap_servers: str = BOOTSTRAP_SERVERS
+):
     consumer = None
     try:
         consumer = KafkaConsumer(
             processor.topic_name,
-            bootstrap_servers=BOOTSTRAP_SERVERS,
+            bootstrap_servers=bootstrap_servers,
             group_id=processor.consumer_id,
             auto_offset_reset="earliest",
         )
@@ -40,7 +42,10 @@ def consume_kafka_messages(processor: AbstractMessageProcessor):
             logger.info(f"Closed consumer for topic: {processor.topic_name}")
 
 
-def start_consumers(processors: List[AbstractMessageProcessor]):
+def start_consumers(
+    processors: List[AbstractMessageProcessor],
+    bootstrap_servers: str = BOOTSTRAP_SERVERS,
+):
     """Run multiple consumers concurrently (one per processor)."""
     if not processors:
         logger.warning("No processors provided")
@@ -52,7 +57,10 @@ def start_consumers(processors: List[AbstractMessageProcessor]):
         for processor in processors:
             t = threading.Thread(
                 target=consume_kafka_messages,
-                args=(processor,),
+                args=(
+                    processor,
+                    bootstrap_servers,
+                ),
                 daemon=True,
                 name=f"consumer-{processor.topic_name}",  # Give threads meaningful names
             )
@@ -64,4 +72,3 @@ def start_consumers(processors: List[AbstractMessageProcessor]):
 
     except KeyboardInterrupt:
         logger.info("Shutting down consumers...")
-        # Threads will exit gracefully due to daemon=True

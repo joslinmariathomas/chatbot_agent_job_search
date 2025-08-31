@@ -7,10 +7,12 @@ from kafka import KafkaProducer
 from kafka_producer_consumer.config import BOOTSTRAP_SERVERS
 
 
-def produce_kafka_messages(topic_name: str, messages: list[dict]):
+def produce_kafka_messages(
+    topic_name: str, messages: list[dict], bootstrap_servers: str = BOOTSTRAP_SERVERS
+):
     create_topic_if_not_exists(topic_name=topic_name)
     producer = KafkaProducer(
-        bootstrap_servers=[BOOTSTRAP_SERVERS],
+        bootstrap_servers=[bootstrap_servers],
         value_serializer=lambda x: (
             json.dumps(x, default=str).encode("utf-8") if x is not None else b"null"
         ),

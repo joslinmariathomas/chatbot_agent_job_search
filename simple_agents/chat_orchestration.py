@@ -1,11 +1,8 @@
-import asyncio
 import logging
-import threading
 from typing import Dict, List, Any, BinaryIO
 from dataclasses import dataclass
 from enum import Enum
 
-from tqdm import tqdm
 
 from default_prompt_responses import general_chat_response, feature_not_added
 from simple_agents.config.config import recent_postings, keys_to_display_jobs
@@ -141,67 +138,7 @@ class ChatbotOrchestrator:
         self.scraper.location = location.lower()
         self.scraper.scrape()
         display_job_list = self.retrieve_latest_jobs()
-
-        def run_async_task():
-            try:
-                asyncio.run(
-                    self.extract_features_and_save_in_qdrant(
-                        job_listings=self.scraper.job_listings,
-                        job_position=job_position,
-                        location=location,
-                    )
-                )
-            except Exception as e:
-                logging.error(f"Background feature extraction failed: {e}")
-
-        threading.Thread(target=run_async_task, daemon=True).start()
         return display_job_list
-
-    async def extract_features_and_save_in_qdrant(
-        self, job_listings: list, job_position: str, location: str
-    ):
-        try:
-            await self.extract_features(
-                job_listings=job_listings, job_position=job_position, location=location
-            )
-        except Exception as e:
-            logging.error(f"Background job failed: {e}")
-
-    def save_to_qdrant(
-        self,
-        job_listings: list[dict],
-        job_position: str,
-        location: str,
-    ):
-        storage_name = f"{job_position}-{location}"
-        self.vector_storage.collection_name = storage_name
-        self.vector_storage.create_collection()
-        self.vector_storage.upload_points(
-            points=job_listings, key_to_encode="description"
-        )
-
-    async def extract_features(
-        self, job_listings: list, job_position: str, location: str
-    ):
-        jobs_features_extracted_list = []
-        for i in tqdm(
-            range(len(job_listings)),
-            desc="Extracting features from job listings",
-            ncols=100,
-        ):
-            job_listing = job_listings[i]
-            job_key_fields_extracted = self.feature_extractor.extract_requirements(
-                job_description=job_listing["description"]
-            )
-            combined_job_details_dict = {**job_listing, **job_key_fields_extracted}
-            jobs_features_extracted_list.append(combined_job_details_dict)
-        if jobs_features_extracted_list:
-            if jobs_features_extracted_list:
-                self.save_to_qdrant(
-                    job_listings=jobs_features_extracted_list,
-                    job_position=job_position,
-                    location=location,
-                )
 
     def retrieve_latest_jobs(self) -> list:
         job_list_to_display = [

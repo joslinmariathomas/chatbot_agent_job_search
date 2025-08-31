@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from kafka.consumer.fetcher import ConsumerRecord
+
 
 class AbstractMessageProcessor(ABC):
     def __init__(self, topic_name: str, consumer_id: str):
@@ -8,7 +10,7 @@ class AbstractMessageProcessor(ABC):
         self.consumer_id = consumer_id
 
     @abstractmethod
-    def handle_message(self, message_data: Any) -> bool:
+    def handle_message(self, message_data: ConsumerRecord):
         """
         Abstract method to process individual message data.
         Must be implemented by subclasses.

@@ -2,6 +2,8 @@ import logging
 from datetime import datetime
 import random
 
+from kafka.consumer.fetcher import ConsumerRecord
+
 from kafka_producer_consumer.kafka_consumer import (
     start_consumers,
 )
@@ -29,7 +31,7 @@ def test_kafka_producer_consumer():
 
 class MessageProcessor(AbstractMessageProcessor):
 
-    def handle_message(self, message):
+    def handle_message(self, message: ConsumerRecord):
         """Process individual message"""
         try:
             # Your message processing logic here

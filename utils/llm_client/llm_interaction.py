@@ -5,8 +5,8 @@ from langchain_ollama import OllamaLLM
 
 
 class LLMInteraction:
-    def __init__(self, model: str = "llama3.2:1b"):
-        self.llm = OllamaLLM(model=model, temperature=0)
+    def __init__(self, model: str = "llama3.2:1b", base_url="http://ollama:11434"):
+        self.llm = OllamaLLM(model=model, temperature=0, base_url=base_url)
 
     def ask_llm(
         self,

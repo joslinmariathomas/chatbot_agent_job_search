@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from pydoc_data.topics import topics
 
 import cloudscraper
 from bs4 import BeautifulSoup
@@ -7,6 +8,7 @@ from typing import Optional
 
 from tqdm import tqdm
 
+from kafka_producer_consumer.kafka_producer import produce_kafka_messages
 from utils.locanto_scraper.config import (
     WEBSITE_TO_SCRAPE,
     DEFAULT_JOB_TO_SEARCH,
@@ -65,10 +67,12 @@ class LocantoScraper:
         soup = self.get_soup(url=url)
         print(f"[+] Checking ads in: {url}")
         ad_html_list = self.get_individual_ads_html(soup=soup)
+        topic_name = f"{self.job_to_search.replace('+','_')}_{self.location}"
         for ad_html in ad_html_list:
             ad_detail_dict = self.parse_ad_detail(ad_html)
             if ad_detail_dict:
                 self.job_listings.append(ad_detail_dict)
+                produce_kafka_messages(topic_name=topic_name, messages=[ad_detail_dict])
 
     @staticmethod
     def get_individual_ads_html(soup: BeautifulSoup) -> list[str]:
