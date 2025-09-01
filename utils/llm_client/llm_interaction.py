@@ -5,27 +5,35 @@ from langchain_ollama import OllamaLLM
 
 
 class LLMInteraction:
-    def __init__(self, model: str = "llama3.2:1b", base_url="http://ollama:11434"):
+    def __init__(
+        self, model: str = "llama3.2:1b", base_url: str = "http://ollama:11434"
+    ):
         self.llm = OllamaLLM(model=model, temperature=0, base_url=base_url)
 
     def ask_llm(
         self,
         system_prompt: str,
         user_prompt: str,
-        json_key: str,
+        json_key: str | None = None,
+        response_type: str = "json",
     ) -> str:
-        enhanced_system_prompt = f"""
-                {system_prompt}
-                
+        enhanced_system_prompt = system_prompt
+        if response_type == "json":
+            enhanced_system_prompt = f"""
+                    {system_prompt}
+                    
+    
+                    Respond ONLY with the JSON object, no additional text.
+                    """
 
-                Respond ONLY with the JSON object, no additional text.
-                """
         messages = [
             SystemMessage(content=enhanced_system_prompt),
             HumanMessage(content=user_prompt),
         ]
 
         response = self.llm.invoke(messages)
+        if response_type != "json":
+            return response
         try:
             json_data = json.loads(response)
         except json.decoder.JSONDecodeError:

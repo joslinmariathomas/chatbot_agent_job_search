@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 def consume_kafka_messages(
     processor: AbstractMessageProcessor, bootstrap_servers: str = BOOTSTRAP_SERVERS
 ):
+    if not check_broker_connectivity(bootstrap_servers=bootstrap_servers):
+        logging.error("Cannot connect to broker, aborting...")
+        return
+
     consumer = None
     try:
         consumer = KafkaConsumer(
@@ -21,25 +25,44 @@ def consume_kafka_messages(
             bootstrap_servers=bootstrap_servers,
             group_id=processor.consumer_id,
             auto_offset_reset="earliest",
+            # Optimized settings for background processing
+            max_poll_interval_ms=300000,  # 5 minutes for heavy AI processing
+            max_poll_records=5,  # Process small batches
+            session_timeout_ms=30000,  # 30 seconds
+            heartbeat_interval_ms=10000,  # 10 seconds
+            enable_auto_commit=True,
+            auto_commit_interval_ms=5000,  # Commit every 5 seconds
         )
 
-        logger.info(f"Started consumer for topic: {processor.topic_name}")
+        logging.info(f"Started consumer for topic: {processor.topic_name}")
 
-        for message in consumer:
+        # Continuous polling loop
+        while True:
             try:
-                processor.handle_message(message)
-            except Exception as e:
-                logger.error(
-                    f"Error processing message from {processor.topic_name}: {e}"
-                )
-                # Continue processing other messages
+                message_batch = consumer.poll(timeout_ms=1000)
+
+                if not message_batch:
+                    continue
+
+                for topic_partition, messages in message_batch.items():
+                    for message in messages:
+                        try:
+                            processor.handle_message(message)
+                        except Exception as e:
+                            logging.error(
+                                f"Error processing message from {processor.topic_name}: {e}"
+                            )
+
+            except KeyboardInterrupt:
+                logging.info("Received shutdown signal, closing consumer...")
+                break
 
     except Exception as e:
-        logger.error(f"Consumer error for {processor.topic_name}: {e}")
+        logging.error(f"Consumer error for {processor.topic_name}: {e}")
     finally:
         if consumer:
             consumer.close()
-            logger.info(f"Closed consumer for topic: {processor.topic_name}")
+            logging.info(f"Closed consumer for topic: {processor.topic_name}")
 
 
 def start_consumers(
@@ -72,3 +95,21 @@ def start_consumers(
 
     except KeyboardInterrupt:
         logger.info("Shutting down consumers...")
+
+
+def check_broker_connectivity(bootstrap_servers: str = BOOTSTRAP_SERVERS):
+    try:
+        consumer = KafkaConsumer(
+            bootstrap_servers=[bootstrap_servers],
+            consumer_timeout_ms=5000,  # 5 second timeout
+        )
+
+        logging.info("Successfully connected to broker")
+        logging.info(f"Available topics: {list(consumer.topics())}")
+
+        consumer.close()
+        return True
+
+    except Exception as e:
+        logging.info(f"Connection failed: {e}")
+        return False

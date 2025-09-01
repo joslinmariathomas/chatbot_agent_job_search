@@ -8,7 +8,9 @@ from typing import Optional
 
 from tqdm import tqdm
 
+from kafka_producer_consumer.config import BOOTSTRAP_SERVERS
 from kafka_producer_consumer.kafka_producer import produce_kafka_messages
+from kafka_topics_consumers import PARSED_JOB_TOPIC
 from utils.locanto_scraper.config import (
     WEBSITE_TO_SCRAPE,
     DEFAULT_JOB_TO_SEARCH,
@@ -39,12 +41,14 @@ class LocantoScraper:
         self,
         job_to_search: str = DEFAULT_JOB_TO_SEARCH,
         location: str = DEFAULT_LOCATION,
+        bootstrap_servers: str = BOOTSTRAP_SERVERS,
     ):
         self.base_url = WEBSITE_TO_SCRAPE
         self.job_to_search = job_to_search.lower().replace(" ", "+")
         self.location = location.lower()
         self.no_of_pages_to_scrape = 1
         self.job_listings = []
+        self.bootstrap_servers = bootstrap_servers
 
     def scrape(self):
         logging.info("Scraping locanto job listings...")
@@ -67,12 +71,15 @@ class LocantoScraper:
         soup = self.get_soup(url=url)
         print(f"[+] Checking ads in: {url}")
         ad_html_list = self.get_individual_ads_html(soup=soup)
-        topic_name = f"{self.job_to_search.replace('+','_')}_{self.location}"
         for ad_html in ad_html_list:
             ad_detail_dict = self.parse_ad_detail(ad_html)
             if ad_detail_dict:
                 self.job_listings.append(ad_detail_dict)
-                produce_kafka_messages(topic_name=topic_name, messages=[ad_detail_dict])
+                produce_kafka_messages(
+                    topic_name=PARSED_JOB_TOPIC,
+                    messages=[ad_detail_dict],
+                    bootstrap_servers=self.bootstrap_servers,
+                )
 
     @staticmethod
     def get_individual_ads_html(soup: BeautifulSoup) -> list[str]:

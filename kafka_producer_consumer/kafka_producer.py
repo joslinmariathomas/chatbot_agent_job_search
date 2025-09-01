@@ -10,7 +10,9 @@ from kafka_producer_consumer.config import BOOTSTRAP_SERVERS
 def produce_kafka_messages(
     topic_name: str, messages: list[dict], bootstrap_servers: str = BOOTSTRAP_SERVERS
 ):
-    create_topic_if_not_exists(topic_name=topic_name)
+    create_topic_if_not_exists(
+        topic_name=topic_name, bootstrap_servers=bootstrap_servers
+    )
     producer = KafkaProducer(
         bootstrap_servers=[bootstrap_servers],
         value_serializer=lambda x: (

@@ -10,14 +10,17 @@ from simple_agents.config.system_prompts import (
     system_prompt_to_identify_query_type,
     system_prompt_to_identify_job,
     system_prompt_to_identify_location,
+    system_prompt_to_summarise_queries,
 )
 from simple_agents.config.user_prompts import (
     user_prompt_to_identify_query_type,
     user_prompt_to_identify_job,
     user_prompt_to_identify_location,
+    get_user_prompt_for_summary,
 )
 from utils.feature_extractor.extract_job_details import JobRequirementsExtractor
 from utils.llm_client.llm_interaction import LLMInteraction
+from utils.locanto_scraper.config import DEFAULT_LOCATION, DEFAULT_JOB_TO_SEARCH
 from utils.locanto_scraper.locanto_scraper import LocantoScraper
 from utils.resume_extractor.resume_parser import CVParser
 from utils.vector_storage.qdrant_storage import QdrantStorage
@@ -68,10 +71,15 @@ class ChatbotOrchestrator:
         self.llm_client = llm_client
         self.conversation_history = []
         self.resume_parser = resume_parser
+        self.user_query_summary = None
 
     def start_chat(self, user_message: str) -> str | None:
         """"""
-        query_type = self.identify_user_query_type(user_message)
+        user_query = self.summarise_user_query(
+            user_query=user_message,
+        )
+
+        query_type = self.identify_user_query_type(user_query)
 
         if EnumeratedQueryType(query_type) == EnumeratedQueryType.JOB_SEARCH:
             location = self.identify_location(user_message)
@@ -107,11 +115,14 @@ class ChatbotOrchestrator:
 
         user_prompt = f"""{user_prompt_to_identify_job} {combined_query}
                 """
-        job_position = self.llm_client.ask_llm(
-            system_prompt=system_prompt_to_identify_job,
-            user_prompt=user_prompt,
-            json_key="job_position",
-        )
+        try:
+            job_position = self.llm_client.ask_llm(
+                system_prompt=system_prompt_to_identify_job,
+                user_prompt=user_prompt,
+                json_key="job_position",
+            )
+        except:
+            job_position = DEFAULT_JOB_TO_SEARCH
         return job_position
 
     def identify_location(self, user_query: str):
@@ -120,11 +131,14 @@ class ChatbotOrchestrator:
         combined_query = "".join(self.conversation_history) + " " + user_query
         user_prompt = f"""{user_prompt_to_identify_location} {combined_query}
                 """
-        location = self.llm_client.ask_llm(
-            system_prompt=system_prompt_to_identify_location,
-            user_prompt=user_prompt,
-            json_key="location",
-        )
+        try:
+            location = self.llm_client.ask_llm(
+                system_prompt=system_prompt_to_identify_location,
+                user_prompt=user_prompt,
+                json_key="location",
+            )
+        except:
+            location = DEFAULT_LOCATION
         return location
 
     def scrape_jobs_and_save_them(
@@ -150,3 +164,16 @@ class ChatbotOrchestrator:
 
     def parse_resume(self, resume_pdf: BinaryIO):
         self.resume_parser.parse_resume(resume_pdf=resume_pdf)
+
+    def summarise_user_query(self, user_query: str) -> str:
+        if self.user_query_summary is None:
+            self.user_query_summary = user_query
+            return user_query
+        self.user_query_summary = self.llm_client.ask_llm(
+            system_prompt=system_prompt_to_summarise_queries,
+            user_prompt=get_user_prompt_for_summary(
+                previous_summary=self.user_query_summary, latest_message=user_query
+            ),
+            response_type="text",
+        )
+        return self.user_query_summary

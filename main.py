@@ -3,6 +3,9 @@ import time
 
 import streamlit as st
 
+from kafka_producer_consumer.config import BOOTSTRAP_SERVERS
+from kafka_producer_consumer.kafka_consumer import start_consumers
+from kafka_topics_consumers import parsed_job_processor
 from simple_agents.chat_orchestration import ChatbotOrchestrator
 from format_streamlit_responses.job_listing_format import display_jobs_interactive
 from utils.feature_extractor.extract_job_details import JobRequirementsExtractor
@@ -13,7 +16,15 @@ from utils.vector_storage.qdrant_storage import QdrantStorage
 
 
 class JobChatApp:
-    def __init__(self):
+    def __init__(
+        self,
+        feature_extractor_rqmt: JobRequirementsExtractor,
+        vector_storage_rqmt: QdrantStorage,
+        llm_client_rqmt: LLMInteraction,
+        scraper_rqmt: LocantoScraper,
+        resume_parser_rqmt: CVParser,
+        bootstrap_servers: str = BOOTSTRAP_SERVERS,
+    ):
         """Initialize app state and chatbot."""
         if "messages" not in st.session_state:
             st.session_state.messages = []
@@ -26,18 +37,23 @@ class JobChatApp:
 
         if "resume_text" not in st.session_state:
             st.session_state.resume_text = None
-
+        self.feature_extractor = feature_extractor_rqmt
+        self.vector_storage = vector_storage_rqmt
+        self.llm_client = llm_client_rqmt
+        self.resume_parser = resume_parser_rqmt
+        self.scraper = scraper_rqmt
+        self.bootstrap_servers = bootstrap_servers
         self.agent = self.init_agent()
 
     @st.cache_resource
     def init_agent(_self):
         """Create and cache chatbot agent."""
         return ChatbotOrchestrator(
-            feature_extractor=JobRequirementsExtractor(),
-            vector_storage=QdrantStorage(),
-            llm_client=LLMInteraction(),
-            scraper=LocantoScraper(),
-            resume_parser=CVParser(),
+            feature_extractor=_self.feature_extractor,
+            vector_storage=_self.vector_storage,
+            llm_client=_self.llm_client,
+            scraper=_self.scraper,
+            resume_parser=_self.resume_parser,
         )
 
     def sidebar(self):
@@ -127,8 +143,32 @@ class JobChatApp:
 
         if prompt := st.chat_input("I am an expert in job search. Let's get started!"):
             self.handle_user_input(prompt)
+        self.consumers_run()
+
+    def consumers_run(self):
+        job_processor = parsed_job_processor(
+            feature_extractor=self.feature_extractor, vector_storage=self.vector_storage
+        )
+        consumer_thread = threading.Thread(
+            target=start_consumers,
+            args=([[job_processor], self.bootstrap_servers]),
+            daemon=True,
+        )
+        consumer_thread.start()
+        time.sleep(5)
 
 
 if __name__ == "__main__":
-    app = JobChatApp()
+    feature_extractor = JobRequirementsExtractor()
+    vector_storage = QdrantStorage()
+    llm_client = LLMInteraction()
+    scraper = LocantoScraper()
+    resume_parser = CVParser()
+    app = JobChatApp(
+        feature_extractor_rqmt=feature_extractor,
+        vector_storage_rqmt=vector_storage,
+        llm_client_rqmt=llm_client,
+        scraper_rqmt=scraper,
+        resume_parser_rqmt=resume_parser,
+    )
     app.run()
