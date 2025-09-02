@@ -27,7 +27,6 @@ services:
     networks:
       - qdrant-network
 
-
   kafka-ui:
     container_name: kafka-ui
     image: provectuslabs/kafka-ui:latest
@@ -41,33 +40,6 @@ services:
     depends_on:
       - kafka
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    networks:
-      - qdrant-network
-    restart: unless-stopped
-
-  ollama-pull:
-    image: ollama/ollama:latest
-    container_name: ollama-pull
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_HOST=http://ollama:11434
-    networks:
-      - qdrant-network
-    depends_on:
-      - ollama
-    command: pull llama3.2:1b
-    restart: "no"
-
   python-app:
     build: .
     container_name: python-app
@@ -78,17 +50,15 @@ services:
       - "8501:8501"
     depends_on:
       - qdrant
-      - ollama
-      - kafka  # Add this dependency
+      - kafka
     networks:
       - qdrant-network
     environment:
       - QDRANT_URL=http://qdrant:6333
-      - OLLAMA_URL=http://ollama:11434
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092  # Add this environment variable
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     command: streamlit run main.py --server.port=8501 --server.address=0.0.0.0
     restart: unless-stopped
-
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -106,12 +76,23 @@ services:
     networks:
       - qdrant-network
 
+  job-consumer:
+    build: .
+    command: python consumer_app.py
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - GROQ_API_KEY=${GROQ_API_KEY}  # Add if consumer also uses Gemini
+    depends_on:
+      - kafka
+      - qdrant
+    networks:
+      - qdrant-network
+    restart: unless-stopped
+
 networks:
   qdrant-network:
     driver: bridge
 
 volumes:
   qdrant_data:
-    driver: local
-  ollama_data:
     driver: local
