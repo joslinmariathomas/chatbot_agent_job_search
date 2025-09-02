@@ -26,7 +26,7 @@ def consume_kafka_messages(
             group_id=processor.consumer_id,
             auto_offset_reset="earliest",
             # Optimized settings for background processing
-            max_poll_interval_ms=300000,  # 5 minutes for heavy AI processing
+            max_poll_interval_ms=3000000,  # 5 minutes for heavy AI processing
             max_poll_records=5,  # Process small batches
             session_timeout_ms=30000,  # 30 seconds
             heartbeat_interval_ms=10000,  # 10 seconds
