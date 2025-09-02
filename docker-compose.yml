@@ -57,7 +57,7 @@ services:
       - QDRANT_URL=http://qdrant:6333
       - GROQ_API_KEY=${GROQ_API_KEY}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-    command: streamlit run main.py --server.port=8501 --server.address=0.0.0.0
+    command: streamlit run streamlit_app.py --server.port=8501 --server.address=0.0.0.0
     restart: unless-stopped
 
   qdrant:
@@ -78,7 +78,7 @@ services:
 
   job-consumer:
     build: .
-    command: python consumer_app.py
+    command: python apps_to_run/consumer_app.py
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - GROQ_API_KEY=${GROQ_API_KEY}  # Add if consumer also uses Gemini

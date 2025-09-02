@@ -2,7 +2,7 @@ import logging
 import signal
 import sys
 from kafka_producer_consumer.kafka_consumer import start_consumers
-from kafka_topics_consumers import parsed_job_processor
+from kafka_producer_consumer.topics_consumers import parsed_job_processor
 from kafka_producer_consumer.config import BOOTSTRAP_SERVERS
 from utils.feature_extractor.extract_job_details import JobRequirementsExtractor
 from utils.vector_storage.qdrant_storage import QdrantStorage

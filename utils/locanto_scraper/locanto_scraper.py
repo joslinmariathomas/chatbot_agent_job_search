@@ -1,6 +1,5 @@
 import logging
 from dataclasses import dataclass
-from pydoc_data.topics import topics
 
 import cloudscraper
 from bs4 import BeautifulSoup
@@ -9,8 +8,6 @@ from typing import Optional
 from tqdm import tqdm
 
 from kafka_producer_consumer.config import BOOTSTRAP_SERVERS
-from kafka_producer_consumer.kafka_producer import produce_kafka_messages
-from kafka_topics_consumers import PARSED_JOB_TOPIC
 from utils.locanto_scraper.config import (
     WEBSITE_TO_SCRAPE,
     DEFAULT_JOB_TO_SEARCH,

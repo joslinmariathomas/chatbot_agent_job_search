@@ -1,9 +1,10 @@
 import json
-from typing import Any
 
 from kafka.consumer.fetcher import ConsumerRecord
 
-from kafka_producer_consumer.message_processor_class import AbstractMessageProcessor
+from kafka_producer_consumer.message_processor_classes.message_processor_class import (
+    AbstractMessageProcessor,
+)
 from utils.feature_extractor.extract_job_details import JobRequirementsExtractor
 from utils.vector_storage.qdrant_storage import QdrantStorage
 

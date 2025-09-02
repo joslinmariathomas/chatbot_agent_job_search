@@ -5,7 +5,9 @@ from typing import List
 from kafka import KafkaConsumer
 
 from kafka_producer_consumer.config import BOOTSTRAP_SERVERS
-from kafka_producer_consumer.message_processor_class import AbstractMessageProcessor
+from kafka_producer_consumer.message_processor_classes.message_processor_class import (
+    AbstractMessageProcessor,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

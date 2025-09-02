@@ -8,7 +8,9 @@ from kafka_producer_consumer.kafka_consumer import (
     start_consumers,
 )
 from kafka_producer_consumer.kafka_producer import produce_kafka_messages
-from kafka_producer_consumer.message_processor_class import AbstractMessageProcessor
+from kafka_producer_consumer.message_processor_classes.message_processor_class import (
+    AbstractMessageProcessor,
+)
 
 
 def test_kafka_producer_consumer():
