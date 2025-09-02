@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 class EnumeratedQueryType(Enum):
     JOB_SEARCH = "job_search"
     JOB_REQUIREMENTS = "job_requirements"
-    COURSE_STRUCTURE = "course_structure"
+    SUGGEST_JOBS_BY_RESUME = "suggest_jobs_by_resume"
     GENERAL_CHAT = "general_chat"
 
 
@@ -69,25 +69,39 @@ class ChatbotOrchestrator:
         self.feature_extractor = feature_extractor
         self.vector_storage = vector_storage
         self.llm_client = llm_client
-        self.conversation_history = []
+        self.scraped_jobs_history = {}
         self.resume_parser = resume_parser
         self.user_query_summary = None
 
     def start_chat(self, user_message: str) -> str | None:
         """"""
         user_query = self.summarise_user_query(
-            user_query=user_message,
+            user_query=f"user_query:{user_message}",
         )
 
         query_type = self.identify_user_query_type(user_query)
 
-        if EnumeratedQueryType(query_type) == EnumeratedQueryType.JOB_SEARCH:
-            location = self.identify_location(user_message)
-            job_position = self.identify_job_name(user_message)
+        if EnumeratedQueryType(query_type) in [
+            EnumeratedQueryType.JOB_SEARCH,
+            EnumeratedQueryType.SUGGEST_JOBS_BY_RESUME,
+        ]:
+            location = self.identify_location(user_query)
+            job_position = self.identify_job_name(user_query)
+            scraping_done = self.job_already_scraped(
+                job_position=job_position, location=location
+            )
+
+            if (
+                EnumeratedQueryType(query_type)
+                == EnumeratedQueryType.SUGGEST_JOBS_BY_RESUME
+            ):
+                return "CV matching is WIP"
+            if scraping_done:
+                return "Already scraped and displayed"  # Implement functionality to retrieve jobs from qdrant
             job_search_update = self.scrape_jobs_and_save_them(
                 job_position=job_position, location=location
             )
-            self.conversation_history.append(user_message)
+
             return job_search_update
         if EnumeratedQueryType(query_type) == EnumeratedQueryType.GENERAL_CHAT:
             general_chat = general_chat_response
@@ -111,9 +125,8 @@ class ChatbotOrchestrator:
     def identify_job_name(self, user_query: str):
         """From the user query and the conversation history,
         using an LLM, here we identify the job name"""
-        combined_query = " ".join(self.conversation_history) + " " + user_query
 
-        user_prompt = f"""{user_prompt_to_identify_job} {combined_query}
+        user_prompt = f"""{user_prompt_to_identify_job} {user_query}
                 """
         try:
             job_position = self.llm_client.ask_llm(
@@ -128,8 +141,7 @@ class ChatbotOrchestrator:
     def identify_location(self, user_query: str):
         """From the user query and the conversation history,
         using an LLM, here we identify the job location user is interested in"""
-        combined_query = "".join(self.conversation_history) + " " + user_query
-        user_prompt = f"""{user_prompt_to_identify_location} {combined_query}
+        user_prompt = f"""{user_prompt_to_identify_location} {user_query}
                 """
         try:
             location = self.llm_client.ask_llm(
@@ -148,10 +160,15 @@ class ChatbotOrchestrator:
     ) -> Any:
         """Identify the job details, and scrape them."""
         logging.info("Extracting location and job details")
+        self.update_scraped_history(job_position=job_position, location=location)
         self.scraper.job_to_search = job_position.lower().replace(" ", "+")
         self.scraper.location = location.lower()
         self.scraper.scrape()
         display_job_list = self.retrieve_latest_jobs()
+        self.summarise_user_query(
+            user_query=f"computer response: The user previously requested jobs for '{self.scraper.job_to_search}' in"
+            f" '{self.scraper.location}', and the results have been retrieved and shown."
+        )
         return display_job_list
 
     def retrieve_latest_jobs(self) -> list:
@@ -161,9 +178,6 @@ class ChatbotOrchestrator:
             if item.get("posted_date", "No date").strip() in recent_postings
         ]
         return job_list_to_display
-
-    def parse_resume(self, resume_pdf: BinaryIO):
-        self.resume_parser.parse_resume(resume_pdf=resume_pdf)
 
     def summarise_user_query(self, user_query: str) -> str:
         if self.user_query_summary is None:
@@ -177,3 +191,23 @@ class ChatbotOrchestrator:
             response_type="text",
         )
         return self.user_query_summary
+
+    def update_scraped_history(self, job_position: str, location: str):
+        """Keeps track of scraped jobs and locations"""
+        job_position = job_position.lower().replace(" ", "_")
+        location = location.lower().replace(" ", "_")
+
+        if job_position not in self.scraped_jobs_history:
+            self.scraped_jobs_history[job_position] = []
+
+        if location not in self.scraped_jobs_history[job_position]:
+            self.scraped_jobs_history[job_position].append(location)
+
+    def job_already_scraped(self, job_position: str, location: str) -> bool:
+        job_position = job_position.lower().replace(" ", "_")
+        location = location.lower().replace(" ", "_")
+
+        return (
+            job_position in self.scraped_jobs_history
+            and location in self.scraped_jobs_history[job_position]
+        )

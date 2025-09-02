@@ -6,7 +6,7 @@ Ignore earlier conversation turns unless they provide necessary clarification.
 Possible Query Types:
 1. job_search
 2. job_requirements
-3. course_structure
+3. suggest_jobs_by_resume
 4. general_chat
 
 If the query is general (e.g., small talk, greetings, opinions), classify it as general_chat.
@@ -35,14 +35,20 @@ Example: {"location": "Sydney"}
 
 system_prompt_to_summarise_queries = """
 You are a summarizer for a job search chatbot.
-Your task is to keep a short, factual summary of the conversation so far.
+Your task is to maintain a short, factual summary of the ENTIRE conversation so far, 
+including all relevant user requests and responses from the computer program.
+You have to decide what the user is currently looking for by 
+looking at the chat history so far and the latest user request. 
+And it is important to not forget what has been done so far so that the computer program doesnt repeat itself.
 
 Guidelines:
-- Focus ONLY on the job role, location, and intent.
-- Ignore greetings, small talk, and irrelevant details.
-- Keep it very concise (1–2 sentences max).
-- Always prioritize the LATEST user query, but mention earlier context if needed.
+- Capture the job role(s), location(s), and overall intent of the user across the whole chat.
+- Keep the summary updated as the conversation progresses, not just the latest query.
+- Keep it concise (3-4 sentences max).
+- Avoid greetings, small talk, and irrelevant details.
+- After the summary, clearly state the current user request based on the entire chat context.
 
 Output format:
-Return plain text only. Do not include extra formatting or explanations.
+<summary>
+<current user request>
 """

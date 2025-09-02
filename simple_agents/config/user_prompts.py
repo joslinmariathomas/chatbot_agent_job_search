@@ -18,7 +18,7 @@ user_prompt_to_identify_location = """Analyze this query and extract location us
 def get_user_prompt_for_summary(previous_summary: str, latest_message: str):
     user_prompt_for_summary = f"""
     Previous summary: {previous_summary}
-    Latest user query: "{latest_message}"
+    Latest user query or computer response: "{latest_message}"
     
     Update the summary so it reflects the current state of the conversation.
     """

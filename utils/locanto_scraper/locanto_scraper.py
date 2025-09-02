@@ -51,6 +51,7 @@ class LocantoScraper:
         self.bootstrap_servers = bootstrap_servers
 
     def scrape(self):
+        self.job_listings = []
         logging.info("Scraping locanto job listings...")
         url = f"{self.base_url}{self.location}/q/?query={self.job_to_search}"
         for page_index in tqdm(
@@ -75,11 +76,11 @@ class LocantoScraper:
             ad_detail_dict = self.parse_ad_detail(ad_html)
             if ad_detail_dict:
                 self.job_listings.append(ad_detail_dict)
-                produce_kafka_messages(
-                    topic_name=PARSED_JOB_TOPIC,
-                    messages=[ad_detail_dict],
-                    bootstrap_servers=self.bootstrap_servers,
-                )
+                # produce_kafka_messages(
+                #     topic_name=PARSED_JOB_TOPIC,
+                #     messages=[ad_detail_dict],
+                #     bootstrap_servers=self.bootstrap_servers,
+                # )
 
     @staticmethod
     def get_individual_ads_html(soup: BeautifulSoup) -> list[str]:
