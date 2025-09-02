@@ -3,9 +3,6 @@ import time
 
 import streamlit as st
 
-from kafka_producer_consumer.config import BOOTSTRAP_SERVERS
-from kafka_producer_consumer.kafka_consumer import start_consumers
-from kafka_topics_consumers import parsed_job_processor
 from simple_agents.chat_orchestration import ChatbotOrchestrator
 from format_streamlit_responses.job_listing_format import display_jobs_interactive
 from utils.feature_extractor.extract_job_details import JobRequirementsExtractor
@@ -23,7 +20,6 @@ class JobChatApp:
         llm_client_rqmt: LLMInteraction,
         scraper_rqmt: LocantoScraper,
         resume_parser_rqmt: CVParser,
-        bootstrap_servers: str = BOOTSTRAP_SERVERS,
     ):
         """Initialize app state and chatbot."""
         if "messages" not in st.session_state:
@@ -42,7 +38,6 @@ class JobChatApp:
         self.llm_client = llm_client_rqmt
         self.resume_parser = resume_parser_rqmt
         self.scraper = scraper_rqmt
-        self.bootstrap_servers = bootstrap_servers
         self.agent = self.init_agent()
 
     @st.cache_resource
@@ -85,7 +80,7 @@ class JobChatApp:
         if file.type == "text/plain":
             resume_text = str(file.read(), "utf-8")
         elif file.type == "application/pdf":
-            resume_text = self.agent.parse_resume(file)
+            resume_text = self.agent.resume_parser.parse_resume(file)
         # Save results in session_state
         st.session_state.resume_text = resume_text
         st.session_state.resume_ready = True
@@ -143,19 +138,6 @@ class JobChatApp:
 
         if prompt := st.chat_input("I am an expert in job search. Let's get started!"):
             self.handle_user_input(prompt)
-        self.consumers_run()
-
-    def consumers_run(self):
-        job_processor = parsed_job_processor(
-            feature_extractor=self.feature_extractor, vector_storage=self.vector_storage
-        )
-        consumer_thread = threading.Thread(
-            target=start_consumers,
-            args=([[job_processor], self.bootstrap_servers]),
-            daemon=True,
-        )
-        consumer_thread.start()
-        time.sleep(5)
 
 
 if __name__ == "__main__":

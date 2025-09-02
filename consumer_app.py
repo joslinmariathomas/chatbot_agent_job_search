@@ -12,10 +12,15 @@ logger = logging.getLogger(__name__)
 
 
 class ConsumerApp:
-    def __init__(self, bootstrap_servers: str = BOOTSTRAP_SERVERS):
+    def __init__(
+        self,
+        feature_extractor_rqmt: JobRequirementsExtractor,
+        vector_storage_rqmt: QdrantStorage,
+        bootstrap_servers: str = BOOTSTRAP_SERVERS,
+    ):
         self.bootstrap_servers = bootstrap_servers
-        self.feature_extractor = JobRequirementsExtractor()
-        self.vector_storage = QdrantStorage()
+        self.feature_extractor = feature_extractor_rqmt
+        self.vector_storage = vector_storage_rqmt
         self.running = True
 
     def setup_signal_handlers(self):
@@ -47,5 +52,10 @@ class ConsumerApp:
 
 
 if __name__ == "__main__":
-    app = ConsumerApp()
+    feature_extractor = JobRequirementsExtractor()
+    vector_storage = QdrantStorage()
+    app = ConsumerApp(
+        feature_extractor_rqmt=feature_extractor,
+        vector_storage_rqmt=vector_storage,
+    )
     app.run()
