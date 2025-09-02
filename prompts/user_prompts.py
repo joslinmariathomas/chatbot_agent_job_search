@@ -13,6 +13,29 @@ user_prompt_to_identify_location = """Analyze this query and extract location us
                 {"location":"<location>"} 
                 user query:
                 """
+user_prompt_to_extract_resume_details = """
+Here is a candidate CV in markdown format. 
+Extract the details into the structured JSON format as defined above. 
+
+CV:
+"""
+
+user_prompt_to_extract_job_features = """
+        Analyze this job description and extract structured information. Return ONLY valid JSON in this exact format:
+
+        {
+            "required_skills": ["skill1", "skill2"],
+            "preferred_skills": ["skill3", "skill4"],
+            "experience_level": "3-5 years",
+            "education": ["Bachelor's in Computer Science"],
+            "technologies": ["Python", "SQL", "AWS"],
+            "soft_skills": ["Communication", "Problem-solving"],
+            "salary_range": "$80,000 - $120,000",
+            "employment_type": "full-time",
+        }
+
+        Job Description:
+        """
 
 
 def get_user_prompt_for_summary(previous_summary: str, latest_message: str):

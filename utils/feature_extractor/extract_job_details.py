@@ -1,7 +1,8 @@
-from typing import Dict
 import json
 from dotenv import load_dotenv
 
+from prompts.system_prompts import system_prompt_to_extract_job_features
+from prompts.user_prompts import user_prompt_to_extract_job_features
 from utils.llm_client.llm_interaction import LLMInteraction
 
 load_dotenv()
@@ -13,49 +14,12 @@ class JobRequirementsExtractor:
     ):
         self.llm = LLMInteraction()
 
-    def extract_requirements(self, job_description: str) -> Dict:
+    def extract_requirements(self, job_description: str) -> dict:
         """Extract structured requirements from job description"""
 
-        system_prompt = """You are an expert skill extractor specializing in analyzing job postings. Your task is to extract key requirements and technical skills from job descriptions with high precision.
-
-        Extract information into these categories:
-        1. REQUIRED_SKILLS: Core technical skills explicitly required
-        2. PREFERRED_SKILLS: Nice-to-have or preferred skills
-        3. EXPERIENCE_LEVEL: Years of experience required
-        4. EDUCATION: Educational requirements
-        5. TECHNOLOGIES: Specific tools, frameworks, programming languages
-        6. SOFT_SKILLS: Communication, leadership, teamwork skills
-        7. SALARY_RANGE: Salary ranges if present
-        8. EMPLOYMENT_TYPE: Full-time,Part-time,hybrid,remote,on-site
-
-        Rules:
-        - Extract exact skill names (e.g., "Python", not "programming languages")
-        - Separate required vs preferred skills
-        - Include version numbers if mentioned (e.g., "Python 3.8+")
-        - Extract salary ranges if present
-        - Identify employment type (full-time, contract, etc.)
-        """
-
-        human_prompt = f"""
-        Analyze this job description and extract structured information. Return ONLY valid JSON in this exact format:
-
-        {{
-            "required_skills": ["skill1", "skill2"],
-            "preferred_skills": ["skill3", "skill4"],
-            "experience_level": "3-5 years",
-            "education": ["Bachelor's in Computer Science"],
-            "technologies": ["Python", "SQL", "AWS"],
-            "soft_skills": ["Communication", "Problem-solving"],
-            "salary_range": "$80,000 - $120,000",
-            "employment_type": "full-time",
-        }}
-
-        Job Description:
-        {job_description}
-        """
-
         response = self.llm.ask_llm(
-            system_prompt=system_prompt, user_prompt=human_prompt
+            system_prompt=system_prompt_to_extract_job_features,
+            user_prompt=f"{user_prompt_to_extract_job_features}{job_description}",
         )
 
         try:
@@ -66,7 +30,7 @@ class JobRequirementsExtractor:
         except json.JSONDecodeError:
             return {}
 
-    def clean_extracted_data(self, data: Dict) -> Dict:
+    def clean_extracted_data(self, data: dict) -> dict:
         """Clean and normalize extracted data"""
         cleaned = {}
         for key, value in data.items():

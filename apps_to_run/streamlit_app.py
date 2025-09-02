@@ -79,10 +79,9 @@ class JobChatApp:
         resume_text = None
         if file.type == "text/plain":
             resume_text = str(file.read(), "utf-8")
+            self.agent.extract_resume_details(resume_text)
         elif file.type == "application/pdf":
-            resume_text = self.agent.resume_parser.parse_resume(file)
-        # Save results in session_state
-        st.session_state.resume_text = resume_text
+            self.agent.extract_resume_details(file)
         st.session_state.resume_ready = True
 
     def display_chat_history(self):
