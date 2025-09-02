@@ -204,10 +204,13 @@ class ChatbotOrchestrator:
             self.scraped_jobs_history[job_position].append(location)
 
     def job_already_scraped(self, job_position: str, location: str) -> bool:
-        job_position = job_position.lower().replace(" ", "_")
-        location = location.lower().replace(" ", "_")
-
-        return (
-            job_position in self.scraped_jobs_history
-            and location in self.scraped_jobs_history[job_position]
-        )
+        try:
+            job_position = job_position.lower().replace(" ", "_")
+            location = location.lower().replace(" ", "_")
+            jobs_scraped = (
+                job_position in self.scraped_jobs_history
+                and location in self.scraped_jobs_history[job_position]
+            )
+        except:
+            jobs_scraped = False
+        return jobs_scraped

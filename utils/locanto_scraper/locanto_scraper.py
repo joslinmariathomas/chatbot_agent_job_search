@@ -8,6 +8,8 @@ from typing import Optional
 from tqdm import tqdm
 
 from kafka_producer_consumer.config import BOOTSTRAP_SERVERS
+from kafka_producer_consumer.kafka_producer import produce_kafka_messages
+from kafka_producer_consumer.topics_consumers import PARSED_JOB_TOPIC
 from utils.locanto_scraper.config import (
     WEBSITE_TO_SCRAPE,
     DEFAULT_JOB_TO_SEARCH,
@@ -73,11 +75,11 @@ class LocantoScraper:
             ad_detail_dict = self.parse_ad_detail(ad_html)
             if ad_detail_dict:
                 self.job_listings.append(ad_detail_dict)
-                # produce_kafka_messages(
-                #     topic_name=PARSED_JOB_TOPIC,
-                #     messages=[ad_detail_dict],
-                #     bootstrap_servers=self.bootstrap_servers,
-                # )
+                produce_kafka_messages(
+                    topic_name=PARSED_JOB_TOPIC,
+                    messages=[ad_detail_dict],
+                    bootstrap_servers=self.bootstrap_servers,
+                )
 
     @staticmethod
     def get_individual_ads_html(soup: BeautifulSoup) -> list[str]:
