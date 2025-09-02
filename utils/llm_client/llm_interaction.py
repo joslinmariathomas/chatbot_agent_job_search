@@ -1,14 +1,25 @@
 import json
-import re
+import logging
+from typing import Any
+
+from dotenv import load_dotenv
+import os
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_ollama import OllamaLLM
+from langchain_groq import ChatGroq
+
+from utils.llm_client.helper_functions import extract_json_from_response
+
+load_dotenv()
 
 
 class LLMInteraction:
-    def __init__(
-        self, model: str = "llama3.2:1b", base_url: str = "http://ollama:11434"
-    ):
-        self.llm = OllamaLLM(model=model, temperature=0, base_url=base_url)
+    def __init__(self, model: str = "gemma2-9b-it", api_key: str = None):
+        if api_key is None:
+            try:
+                os.getenv("GROQ_API_KEY")
+            except KeyError:
+                logging.error("GROQ_API_KEY environment variable not set")
+        self.llm = ChatGroq(model=model, temperature=0)
 
     def ask_llm(
         self,
@@ -16,7 +27,7 @@ class LLMInteraction:
         user_prompt: str,
         json_key: str | None = None,
         response_type: str = "json",
-    ) -> str:
+    ) -> Any:
         enhanced_system_prompt = system_prompt
         if response_type == "json":
             enhanced_system_prompt = f"""
@@ -31,32 +42,13 @@ class LLMInteraction:
             HumanMessage(content=user_prompt),
         ]
 
-        response = self.llm.invoke(messages)
+        response = self.llm.invoke(messages).content
         if response_type != "json":
             return response
         try:
             json_data = json.loads(response)
+            if json_key is None:
+                return json_data
         except json.decoder.JSONDecodeError:
-            json_string = self.extract_json_from_response(response)
-            json_data = json.loads(json_string)
+            json_data = extract_json_from_response(response)
         return json_data[json_key]
-
-    @staticmethod
-    def extract_json_from_response(response: str) -> str:
-        """Extract JSON from LLM response, handling various formats"""
-        # Strip whitespace
-        response = response.strip()
-        json_match = bool(re.search(r"[`\n]", response))
-        if json_match:
-            json_match = response.replace("`", "").replace("\n", "")
-            try:
-                response = json.loads(json_match)
-                return response
-            except json.decoder.JSONDecodeError:
-                if not response.startswith("{") or not response.endswith("}"):
-                    response = "{" + response + "}"
-                return response
-
-        if not response.startswith("{") or not response.endswith("}"):
-            response = "{" + response + "}"
-        return response
