@@ -1,14 +1,17 @@
-from langchain_ollama.llms import OllamaLLM
-from langchain.schema import HumanMessage, SystemMessage
 from typing import Dict
 import json
+from dotenv import load_dotenv
+
+from utils.llm_client.llm_interaction import LLMInteraction
+
+load_dotenv()
 
 
 class JobRequirementsExtractor:
     def __init__(
-        self, model: str = "llama3.2:1b", base_url: str = "http://ollama:11434"
+        self,
     ):
-        self.llm = OllamaLLM(model=model, temperature=0, base_url=base_url)
+        self.llm = LLMInteraction()
 
     def extract_requirements(self, job_description: str) -> Dict:
         """Extract structured requirements from job description"""
@@ -51,16 +54,12 @@ class JobRequirementsExtractor:
         {job_description}
         """
 
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=human_prompt),
-        ]
-
-        response = self.llm.invoke(messages)
+        response = self.llm.ask_llm(
+            system_prompt=system_prompt, user_prompt=human_prompt
+        )
 
         try:
-            extracted_data = json.loads(response)
-            cleaned_data = self.clean_extracted_data(extracted_data)
+            cleaned_data = self.clean_extracted_data(response)
 
             return cleaned_data
 

@@ -18,7 +18,7 @@ def parsed_job_processor(
 
     processor = FeatureExtractorProcessor(
         topic_name=PARSED_JOB_TOPIC,
-        consumer_id=PARSED_JOB_FEATURE_EXTRACTOR,
+        consumer_id="PARSED_JOB_FEATURE_EXTRACTOR",
         job_requirements=feature_extractor,
         vector_storage=vector_storage,
     )
