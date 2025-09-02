@@ -24,7 +24,7 @@ def test_feature_extractor_consumer(mock_method):
     topic_name = f"test_topic{uuid.uuid4()}"
     consumer_id = "test_consumer"
     vector_storage = QdrantStorage(client_server="http://localhost:6333")
-    job_extractor = JobRequirementsExtractor(base_url="http://localhost:11434")
+    job_extractor = JobRequirementsExtractor()
     produce_kafka_messages(
         topic_name=topic_name, messages=[data], bootstrap_servers="localhost:9092"
     )

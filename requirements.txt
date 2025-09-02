@@ -1,5 +1,5 @@
 langgraph
-langchain-google-genai
+langchain-groq
 langchain
 langchain_core
 langchain_ollama
