@@ -1,22 +1,29 @@
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, BinaryIO
 from dataclasses import dataclass
 from enum import Enum
-
-
-from prompts.default_prompt_responses import general_chat_response, feature_not_added
-from simple_agents.config.config import recent_postings, keys_to_display_jobs
+from prompts.default_prompt_responses import (
+    default_response_for_general_chat,
+    default_response_for_feature_not_added,
+    default_response_for_resume_not_uploaded,
+    default_response_for_gap_analysis,
+)
+from simple_agent.config.config import recent_postings, keys_to_display_jobs
 from prompts.system_prompts import (
     system_prompt_to_identify_query_type,
     system_prompt_to_identify_job,
     system_prompt_to_identify_location,
     system_prompt_to_summarise_queries,
+    system_prompt_to_extract_job_details_for_gap_analysis,
+    system_prompt_to_do_gap_analysis,
 )
 from prompts.user_prompts import (
     user_prompt_to_identify_query_type,
     user_prompt_to_identify_job,
     user_prompt_to_identify_location,
     get_user_prompt_for_summary,
+    user_prompt_to_extract_job_details_for_gap_analysis,
+    user_prompt_to_do_gap_analysis,
 )
 from utils.feature_extractor.extract_job_details import JobRequirementsExtractor
 from utils.llm_client.llm_interaction import LLMInteraction
@@ -32,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 class EnumeratedQueryType(Enum):
     JOB_SEARCH = "job_search"
-    JOB_REQUIREMENTS = "job_requirements"
+    JOB_GAP_ANALYSIS = "job_gap_analysis"
     SUGGEST_JOBS_BY_RESUME = "suggest_jobs_by_resume"
     GENERAL_CHAT = "general_chat"
 
@@ -72,12 +79,12 @@ class ChatbotOrchestrator:
         self.scraped_jobs_history = {}
         self.resume_parser = resume_parser
         self.user_query_summary = None
+        self.location = None
+        self.job_position = None
 
     def start_chat(self, user_message: str) -> str | None:
         """"""
-        user_query = self.summarise_user_query(
-            user_query=f"user_query:{user_message}",
-        )
+        user_query = self.summarise_user_query(user_query=f"user_query:{user_message}")
 
         query_type = self.identify_user_query_type(user_query)
 
@@ -85,29 +92,35 @@ class ChatbotOrchestrator:
             EnumeratedQueryType.JOB_SEARCH,
             EnumeratedQueryType.SUGGEST_JOBS_BY_RESUME,
         ]:
-            location = self.identify_location(user_query)
-            job_position = self.identify_job_name(user_query)
+            self.location = self.identify_location(user_query)
+            self.job_position = self.identify_job_name(user_query)
             scraping_done = self.job_already_scraped(
-                job_position=job_position, location=location
+                job_position=self.job_position, location=self.location
             )
 
             if (
                 EnumeratedQueryType(query_type)
                 == EnumeratedQueryType.SUGGEST_JOBS_BY_RESUME
             ):
-                return "CV matching is WIP"
+                return self.handle_resume_queries(
+                    user_query=user_query, query_type=query_type
+                )
+
             if scraping_done:
                 return "Already scraped and displayed"  # Implement functionality to retrieve jobs from qdrant
             job_search_update = self.scrape_jobs_and_save_them(
-                job_position=job_position, location=location
+                job_position=self.job_position, location=self.location
             )
 
             return job_search_update
         if EnumeratedQueryType(query_type) == EnumeratedQueryType.GENERAL_CHAT:
-            general_chat = general_chat_response
+            general_chat = default_response_for_general_chat
             return general_chat
-
-        return feature_not_added
+        if EnumeratedQueryType(query_type) == EnumeratedQueryType.JOB_GAP_ANALYSIS:
+            return self.handle_resume_queries(
+                user_query=user_query, query_type=query_type
+            )
+        return default_response_for_feature_not_added
 
     def identify_user_query_type(self, user_query: str):
         """ "Identifies user query type - if user wants to scrape jobs
@@ -126,17 +139,15 @@ class ChatbotOrchestrator:
         """From the user query and the conversation history,
         using an LLM, here we identify the job name"""
 
-        user_prompt = f"""{user_prompt_to_identify_job} {user_query}
-                """
+        user_prompt = f"{user_prompt_to_identify_job} {user_query}"
         try:
-            job_position = self.llm_client.ask_llm(
+            return self.llm_client.ask_llm(
                 system_prompt=system_prompt_to_identify_job,
                 user_prompt=user_prompt,
                 json_key="job_position",
             )
         except:
-            job_position = DEFAULT_JOB_TO_SEARCH
-        return job_position
+            return DEFAULT_JOB_TO_SEARCH
 
     def identify_location(self, user_query: str):
         """From the user query and the conversation history,
@@ -161,8 +172,8 @@ class ChatbotOrchestrator:
         """Identify the job details, and scrape them."""
         logging.info("Extracting location and job details")
         self.update_scraped_history(job_position=job_position, location=location)
-        self.scraper.job_to_search = job_position.lower().replace(" ", "+")
-        self.scraper.location = location.lower()
+        self.scraper.job_to_search = job_position
+        self.scraper.location = location
         self.scraper.scrape()
         display_job_list = self.retrieve_latest_jobs()
         self.summarise_user_query(
@@ -214,3 +225,70 @@ class ChatbotOrchestrator:
         except:
             jobs_scraped = False
         return jobs_scraped
+
+    def extract_resume_details(self, resume: BinaryIO | str):
+        """Extracts key skills and experience from the resume"""
+        self.resume_parser.parse_resume(resume)
+        resume_dict = self.resume_parser.extract_resume_details()
+        self.vector_storage.collection_name = "resumes_extracted"
+        self.vector_storage.create_collection()
+        self.vector_storage.upload_points(
+            points=[resume_dict], key_to_encode="RAW_TEXT"
+        )
+
+    def handle_resume_queries(
+        self,
+        query_type: str,
+        user_query: str,
+    ) -> str:
+        """Job gap analysis and suggestions based on resume is handled here"""
+        if not self.resume_parser.resume_uploaded:
+            return default_response_for_resume_not_uploaded
+        if EnumeratedQueryType(query_type) == EnumeratedQueryType.JOB_GAP_ANALYSIS:
+            return self.job_gap_analysis(user_query=user_query)
+        self.summarise_user_query(
+            user_query="computer response: The user previously requested a resume-related feature, "
+            "but it has not been implemented yet."
+        )
+        return default_response_for_feature_not_added
+
+    def job_gap_analysis(self, user_query: str) -> str:
+
+        user_prompt = (
+            f"{user_prompt_to_extract_job_details_for_gap_analysis} {user_query}"
+        )
+        job_key_details = self.llm_client.ask_llm(
+            system_prompt=system_prompt_to_extract_job_details_for_gap_analysis,
+            user_prompt=user_prompt,
+        )
+        if job_key_details:
+            job_description = (
+                self.vector_storage.retrieve_docs_based_on_keyword_filters(
+                    keyword_filters=job_key_details,
+                )
+            )
+            gap_analysis = self.gap_analysis_by_job(job_description=job_description)
+            self.summarise_user_query(
+                user_query=f"computer response: The user requested a gap analysis of {job_key_details} "
+                "against their resume. The gap analysis was evaluated and shown to the user."
+            )
+            return gap_analysis
+        self.summarise_user_query(
+            user_query="computer response: The user asked for a gap analysis between their resume and a job, "
+            "but the job could not be identified. The system requested the job URL again."
+        )
+        return default_response_for_gap_analysis
+
+    def gap_analysis_by_job(
+        self,
+        job_description: str,
+    ) -> str:
+        resume = self.resume_parser.resume_in_text
+        user_prompt = user_prompt_to_do_gap_analysis.format(
+            job_description=job_description, resume_text=resume
+        )
+        return self.llm_client.ask_llm(
+            system_prompt=system_prompt_to_do_gap_analysis,
+            user_prompt=user_prompt,
+            response_type="text",
+        )

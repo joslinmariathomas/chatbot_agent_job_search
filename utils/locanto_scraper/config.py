@@ -21,6 +21,14 @@ ITEMS_TO_SCRAPE = [
     "description",
     "posted_date",
 ]
+ITEMS_NAMING_MAPPING = {
+    "id": "id",
+    "Job position": "job_position",
+    "Company name": "company_name",
+    "description": "description",
+    "suburb": "suburb",
+    "posted_date": "posted_date",
+}
 ITEM_HTML_TAG_MAPPING = {
     "id": "a",
     "Job position": "li",

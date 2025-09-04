@@ -4,9 +4,10 @@ from pathlib import Path
 from typing import Optional
 
 from qdrant_client import models, QdrantClient
+from qdrant_client.models import Filter
 from sentence_transformers import SentenceTransformer
 
-from utils.vector_storage.config import QdrantClientServer
+from utils.vector_storage.config import QdrantClientServer, FILTER_CONDITIONS_BY_KEYS
 
 
 class QdrantStorage:
@@ -56,11 +57,14 @@ class QdrantStorage:
             f"Loaded SentenceTransformer model '{sentence_transformer_model}' on CPU"
         )
 
-    def create_collection(self):
+    def create_collection(self, create_indexes: bool = True):
         check_collection_exists = self.client.collection_exists(
             collection_name=self.collection_name
         )
-        logging.info(f"Collection {self.collection_name} exists")
+        logging.info(
+            f"Collection {self.collection_name} exists: {check_collection_exists}"
+        )
+
         if not check_collection_exists:
             logging.info(f"Creating collection {self.collection_name}")
             self.client.create_collection(
@@ -70,6 +74,12 @@ class QdrantStorage:
                     distance=models.Distance.COSINE,
                 ),
             )
+            if create_indexes:
+                job_search_indexes = [
+                    ("job_position", "keyword"),
+                    ("suburb", "keyword"),
+                ]
+                self.create_payload_indexes(job_search_indexes)
 
     def upload_points(
         self,
@@ -85,7 +95,7 @@ class QdrantStorage:
             if given_ids and len(given_ids) == len(vectorised_points)
             else [str(uuid.uuid4()) for _ in vectorised_points]
         )
-        payloads = self.get_payloads(points=points, key_to_encode=key_to_encode)
+        payloads = self.get_payloads(points=points)
         self.client.upsert(
             collection_name=self.collection_name,
             points=models.Batch(
@@ -128,6 +138,31 @@ class QdrantStorage:
         return hits
 
     @staticmethod
+    def get_payloads(points: list[dict]) -> list[dict]:
+        return [{key: value for key, value in point.items()} for point in points]
+
+    def create_payload_indexes(self, index_fields: list[tuple[str, str]]):
+        """
+        Create payload indexes for specified fields.
+
+        Args:
+            index_fields: List of tuples containing (field_name, field_type)
+                         e.g., [("job_position", "keyword"), ("suburb", "keyword")]
+        """
+        for field_name, field_type in index_fields:
+            try:
+                self.client.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=field_name,
+                    field_schema=field_type,
+                )
+                logging.info(
+                    f"Created payload index for field '{field_name}' with type '{field_type}'"
+                )
+            except Exception as e:
+                logging.warning(f"Failed to create index for field '{field_name}': {e}")
+
+    @staticmethod
     def create_filters(filters: Optional[dict[str:dict]]):
         if "must" in filters:
             must_filters = []
@@ -137,8 +172,45 @@ class QdrantStorage:
         return None
 
     @staticmethod
-    def get_payloads(points: list[dict], key_to_encode: str) -> list[dict]:
-        return [
-            {key: value for key, value in point.items() if key != key_to_encode}
-            for point in points
-        ]
+    def create_filters_by_must_should_keywords(
+        keyword_filters: Optional[dict[str, str]],
+    ) -> dict:
+        combined_filters = {}
+        for filter_type in ["must", "should"]:
+            filter_list = []
+            keys_to_filter = FILTER_CONDITIONS_BY_KEYS.get(filter_type, [])
+            for key in keys_to_filter:
+                if keyword_filters.get(key) is not None:
+                    if key == "url":
+                        filter_list.append(
+                            models.FieldCondition(
+                                key=key,
+                                match=models.MatchValue(value=keyword_filters[key]),
+                            )
+                        )
+                    else:
+                        filter_list.append(
+                            models.FieldCondition(
+                                key=key,
+                                match=models.MatchText(text=keyword_filters[key]),
+                            )
+                        )
+            combined_filters[filter_type] = filter_list
+        return combined_filters
+
+    def retrieve_docs_based_on_keyword_filters(
+        self, keyword_filters: dict[str:dict]
+    ) -> str:
+        filters = self.create_filters_by_must_should_keywords(keyword_filters)
+        result = self.client.scroll(
+            collection_name="parsed_job.topic",
+            scroll_filter=models.Filter(
+                must=filters.get("must", []),
+                should=filters.get("should", []),
+            ),
+            limit=3,
+        )
+        interested_job_description = result[0][0].payload.get(
+            "description"
+        )  # Implement multiple matches and response later
+        return interested_job_description

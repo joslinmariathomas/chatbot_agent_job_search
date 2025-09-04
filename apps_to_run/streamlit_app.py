@@ -3,7 +3,7 @@ import time
 
 import streamlit as st
 
-from simple_agents.chat_orchestration import ChatbotOrchestrator
+from simple_agent.chat_orchestration import ChatbotOrchestrator
 from format_streamlit_responses.job_listing_format import display_jobs_interactive
 from utils.feature_extractor.extract_job_details import JobRequirementsExtractor
 from utils.llm_client.llm_interaction import LLMInteraction
@@ -76,12 +76,12 @@ class JobChatApp:
 
     def parse_resume_background(self, file):
         """Process resume in a background thread."""
-        resume_text = None
         if file.type == "text/plain":
             resume_text = str(file.read(), "utf-8")
             self.agent.extract_resume_details(resume_text)
         elif file.type == "application/pdf":
             self.agent.extract_resume_details(file)
+        self.agent.resume_parser.resume_uploaded = True
         st.session_state.resume_ready = True
 
     def display_chat_history(self):

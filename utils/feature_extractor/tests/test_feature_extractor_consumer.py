@@ -17,7 +17,7 @@ def test_feature_extractor_consumer(mock_method):
     data = {
         "suburb": "North Sydney",
         "id": uuid.uuid4(),
-        "Job position": None,
+        "job_position": None,
         "Company name": "oOh!",
         "description": "test_description",
     }

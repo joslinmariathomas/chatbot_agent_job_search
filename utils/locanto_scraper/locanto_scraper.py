@@ -19,6 +19,7 @@ from utils.locanto_scraper.config import (
     ITEM_HTML_ATTRIBUTE_MAPPING,
     ITEM_SEARCH_STRATEGY,
     SEARCH_STRATEGIES,
+    ITEMS_NAMING_MAPPING,
 )
 from utils.locanto_scraper.scraper_helper_functions import cleanup_html_tag
 
@@ -92,7 +93,7 @@ class LocantoScraper:
         """Scrapes and parses the details of a single ad page."""
         print(f"[+] Scraping: {url}")
         soup = self.get_soup(url)
-        html_dict = {}
+        html_dict = {"url": url}
         for item in ITEMS_TO_SCRAPE:
             tag = ITEM_HTML_TAG_MAPPING.get(item)
             attr_value = ITEM_HTML_ATTRIBUTE_MAPPING.get(item)
@@ -103,17 +104,19 @@ class LocantoScraper:
                     cleaned_retrieved_value = html_tag_finder(
                         feature_name=item, soup=soup, tag=tag, value=attr_value
                     )
-                    html_dict[item] = cleaned_retrieved_value
+                    if cleaned_retrieved_value is None:
+                        return {}
+                    html_dict[ITEMS_NAMING_MAPPING[item]] = cleaned_retrieved_value
                 else:
                     html_retrieved_value = html_tag_finder(
                         soup=soup, tag=tag, value=attr_value
                     )
-                    cleaned = cleanup_html_tag(
+                    cleaned_retrieved_value = cleanup_html_tag(
                         html_retrieved_value=html_retrieved_value, item=item
                     )
-                    html_dict[item] = cleaned
+                    if cleaned_retrieved_value is not None:
+                        html_dict[ITEMS_NAMING_MAPPING[item]] = cleaned_retrieved_value
             except Exception as e:
                 print(f"[Not OK] {item}")
-        if html_dict:
-            html_dict["url"] = url
+
         return html_dict

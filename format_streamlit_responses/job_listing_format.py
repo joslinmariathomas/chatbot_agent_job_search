@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 
-def display_jobs_interactive(jobs_list):
+def display_jobs_interactive(jobs_list: list[dict]):
     """
     Display jobs using st.data_editor with link columns
     """
@@ -10,13 +10,11 @@ def display_jobs_interactive(jobs_list):
         st.warning("No jobs to display")
         return
 
-    # Convert to DataFrame
     df = pd.DataFrame(jobs_list)
 
-    # Prepare data for data_editor
     display_data = {
-        "Job Position": df["Job position"].tolist(),
-        "Company Name": df["Company name"].tolist(),
+        "Job Position": df["job_position"].tolist(),
+        "Company Name": df["company_name"].tolist(),
         "Apply Link": df["url"].tolist(),
     }
     display_df = pd.DataFrame(display_data)

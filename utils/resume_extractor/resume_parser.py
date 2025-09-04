@@ -12,6 +12,7 @@ from utils.llm_client.llm_interaction import LLMInteraction
 class CVParser:
     def __init__(self):
         self.converter = DocumentConverter()
+        self.resume_uploaded = False
         self.parsed_uploaded_resume = False
         self.resume_in_text = None
         self.llm = LLMInteraction()

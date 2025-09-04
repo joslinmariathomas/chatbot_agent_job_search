@@ -51,4 +51,6 @@ class LLMInteraction:
                 return json_data
         except json.decoder.JSONDecodeError:
             json_data = extract_json_from_response(response)
+            if json_key is None:
+                return json_data
         return json_data[json_key]

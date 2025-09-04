@@ -36,6 +36,25 @@ user_prompt_to_extract_job_features = """
 
         Job Description:
         """
+user_prompt_to_extract_job_details_for_gap_analysis = """
+Extract job information from this gap analysis request:
+
+Return the information in the specified JSON format.
+Query: 
+"""
+
+user_prompt_to_do_gap_analysis = """
+Here is the job description:
+
+{job_description}
+
+Here is my resume:
+
+{resume_text}
+
+Please provide a gap analysis highlighting strengths and fallbacks in relation to this job. 
+Explain it in a natural, conversational way so I can understand where I am a good fit and where I may need to improve.
+"""
 
 
 def get_user_prompt_for_summary(previous_summary: str, latest_message: str):
