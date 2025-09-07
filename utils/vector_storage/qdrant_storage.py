@@ -1,11 +1,9 @@
 import logging
 import uuid
-from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
+from fastembed import SparseTextEmbedding, TextEmbedding
 from qdrant_client import models, QdrantClient
-from qdrant_client.models import Filter
-from sentence_transformers import SentenceTransformer
 
 from utils.vector_storage.config import QdrantClientServer, FILTER_CONDITIONS_BY_KEYS
 
@@ -13,127 +11,139 @@ from utils.vector_storage.config import QdrantClientServer, FILTER_CONDITIONS_BY
 class QdrantStorage:
     def __init__(
         self,
-        collection_name: str = "test_collection",
         distance: str = models.Distance.COSINE,
-        sentence_transformer_model: str = "all-MiniLM-L6-v2",
+        sentence_transformer_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+        sparse_embedding_model: str = "Qdrant/bm25",
         client_server: str = QdrantClientServer,
     ):
         self.client = QdrantClient(url=client_server)
-        self.collection_name = collection_name
         self.distance = distance
+        self.encoder = TextEmbedding(sentence_transformer_model)
+        self.sparse_encoder = SparseTextEmbedding(sparse_embedding_model)
 
-        # Ensure the model is downloaded locally to avoid meta tensor issues
-        cache_dir = Path.home() / ".cache" / "torch" / "sentence_transformers"
-        cache_dir.mkdir(parents=True, exist_ok=True)
-
-        try:
-            self.encoder = SentenceTransformer(
-                sentence_transformer_model,
-                device="cpu",
-                cache_folder=str(cache_dir),
-                trust_remote_code=True,
-            )
-        except RuntimeError as e:
-            logging.warning(f"Failed to load model on first attempt: {e}")
-            # Force download by initializing from HuggingFace model first
-            from transformers import AutoModel, AutoTokenizer
-
-            AutoModel.from_pretrained(
-                sentence_transformer_model, cache_dir=str(cache_dir)
-            )
-            AutoTokenizer.from_pretrained(
-                sentence_transformer_model, cache_dir=str(cache_dir)
-            )
-
-            # Retry loading SentenceTransformer
-            self.encoder = SentenceTransformer(
-                sentence_transformer_model,
-                device="cpu",
-                cache_folder=str(cache_dir),
-                trust_remote_code=True,
-            )
-
-        logging.info(
-            f"Loaded SentenceTransformer model '{sentence_transformer_model}' on CPU"
-        )
-
-    def create_collection(self, create_indexes: bool = True):
+    def create_collection(
+        self,
+        collection_name: str,
+        create_indexes: bool = True,
+    ):
+        dense_embeddings = list(self.encoder.passage_embed("test_embeddings"))
         check_collection_exists = self.client.collection_exists(
-            collection_name=self.collection_name
+            collection_name=collection_name
         )
-        logging.info(
-            f"Collection {self.collection_name} exists: {check_collection_exists}"
-        )
+        logging.info(f"Collection {collection_name} exists: {check_collection_exists}")
 
         if not check_collection_exists:
-            logging.info(f"Creating collection {self.collection_name}")
+            logging.info(f"Creating collection {collection_name}")
             self.client.create_collection(
-                collection_name=self.collection_name,
-                vectors_config=models.VectorParams(
-                    size=self.encoder.get_sentence_embedding_dimension(),
-                    distance=models.Distance.COSINE,
-                ),
+                collection_name=collection_name,
+                vectors_config={
+                    "all-MiniLM-L6-v2": models.VectorParams(
+                        size=len(dense_embeddings[0]),
+                        distance=models.Distance.COSINE,
+                    )
+                },
+                sparse_vectors_config={
+                    "bm25": models.SparseVectorParams(
+                        modifier=models.Modifier.IDF,
+                    )
+                },
             )
             if create_indexes:
                 job_search_indexes = [
                     ("job_position", "keyword"),
                     ("suburb", "keyword"),
                 ]
-                self.create_payload_indexes(job_search_indexes)
+                self.create_payload_indexes(
+                    collection_name=collection_name, index_fields=job_search_indexes
+                )
 
     def upload_points(
         self,
         points: list[dict],
         key_to_encode: str,
+        collection_name: str,
         given_ids: list = None,
     ):
         vectorised_points = self.structure_points(
-            points=points, key_to_encode=key_to_encode
+            points=points, key_to_encode=key_to_encode, given_ids=given_ids
         )
+        self.client.upload_points(
+            collection_name=collection_name,
+            points=vectorised_points,
+        )
+
+    def structure_points(
+        self,
+        points: list[dict],
+        key_to_encode: str,
+        given_ids: list[Any] = None,
+    ):
         ids = (
             given_ids
-            if given_ids and len(given_ids) == len(vectorised_points)
-            else [str(uuid.uuid4()) for _ in vectorised_points]
+            if given_ids and len(given_ids) == len(points)
+            else [str(uuid.uuid4()) for _ in points]
         )
         payloads = self.get_payloads(points=points)
-        self.client.upsert(
-            collection_name=self.collection_name,
-            points=models.Batch(
-                payloads=payloads,
-                vectors=vectorised_points,
-                ids=ids,
-            ),
-        )
-
-    def structure_points(self, points: list[dict], key_to_encode: str):
-        vectorised_points = [
-            self.encoder.encode(point[key_to_encode]).tolist() for point in points
-        ]
-        return vectorised_points
-
-    def encode_query(self, query: str):
-        return self.encoder.encode(query).tolist()
+        structured_points = []
+        for i, point in enumerate(points):
+            vector_encoded_point = list(
+                self.encoder.passage_embed(point[key_to_encode])
+            )
+            sparse_embeddings = list(
+                self.sparse_encoder.passage_embed(point[key_to_encode])
+            )
+            updated_point = models.PointStruct(
+                id=ids[i],
+                vector={
+                    "all-MiniLM-L6-v2": vector_encoded_point[0].tolist(),
+                    "bm25": sparse_embeddings[0].as_object(),
+                },
+                payload=payloads[i],
+            )
+            structured_points.append(updated_point)
+        return structured_points
 
     def retrieve_docs_based_on_query(
         self,
+        collection_name: str,
         query: str,
         filter: Optional[dict[str:dict]] = None,
         limit: int = 3,
     ):
-        encoded_query = self.encode_query(query)
+        dense_query_vector = next(self.encoder.query_embed(query))
+        sparse_query_vector = next(self.sparse_encoder.query_embed(query))
+        prefetch = [
+            models.Prefetch(
+                query=dense_query_vector,
+                using="all-MiniLM-L6-v2",
+                limit=limit,
+            ),
+            models.Prefetch(
+                query=models.SparseVector(**sparse_query_vector.as_object()),
+                using="bm25",
+                limit=limit,
+            ),
+        ]
         if not filter:
             hits = self.client.query_points(
-                collection_name=self.collection_name,
-                query=encoded_query,
+                collection_name=collection_name,
+                prefetch=prefetch,
+                query=models.FusionQuery(
+                    fusion=models.Fusion.RRF,
+                ),
                 limit=limit,
             ).points
             return hits
         must_filter = self.create_filters(filter)
         hits = self.client.query_points(
-            collection_name=self.collection_name,
-            query=encoded_query,
+            collection_name=collection_name,
+            prefetch=prefetch,
+            query=models.FusionQuery(
+                fusion=models.Fusion.RRF,
+            ),
             query_filter=models.Filter(must=must_filter),
             limit=limit,
+            using="all-MiniLM-L6-v2",
         ).points
         return hits
 
@@ -141,18 +151,17 @@ class QdrantStorage:
     def get_payloads(points: list[dict]) -> list[dict]:
         return [{key: value for key, value in point.items()} for point in points]
 
-    def create_payload_indexes(self, index_fields: list[tuple[str, str]]):
+    def create_payload_indexes(
+        self, collection_name: str, index_fields: list[tuple[str, str]]
+    ):
         """
         Create payload indexes for specified fields.
 
-        Args:
-            index_fields: List of tuples containing (field_name, field_type)
-                         e.g., [("job_position", "keyword"), ("suburb", "keyword")]
         """
         for field_name, field_type in index_fields:
             try:
                 self.client.create_payload_index(
-                    collection_name=self.collection_name,
+                    collection_name=collection_name,
                     field_name=field_name,
                     field_schema=field_type,
                 )
@@ -198,19 +207,27 @@ class QdrantStorage:
             combined_filters[filter_type] = filter_list
         return combined_filters
 
+    def encode_sparse(self, text: str):
+        """
+        Encode text into sparse vector using SentenceTransformers
+        """
+        sparse_embedding = self.sparse_encoder.encode([text])
+        return sparse_embedding[0]
+
     def retrieve_docs_based_on_keyword_filters(
-        self, keyword_filters: dict[str:dict]
+        self,
+        collection_name: str,
+        keyword_filters: dict[str:dict],
+        limit: int = 3,
     ) -> str:
         filters = self.create_filters_by_must_should_keywords(keyword_filters)
         result = self.client.scroll(
-            collection_name="parsed_job.topic",
+            collection_name=collection_name,
             scroll_filter=models.Filter(
                 must=filters.get("must", []),
                 should=filters.get("should", []),
             ),
-            limit=3,
+            limit=limit,
         )
-        interested_job_description = result[0][0].payload.get(
-            "description"
-        )  # Implement multiple matches and response later
+        interested_job_description = result[0][0].payload.get("description")
         return interested_job_description

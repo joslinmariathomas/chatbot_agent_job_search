@@ -2,6 +2,8 @@ import logging
 from typing import Dict, List, Any, BinaryIO
 from dataclasses import dataclass
 from enum import Enum
+
+from kafka_producer_consumer.topics_consumers import PARSED_JOB_TOPIC
 from prompts.default_prompt_responses import (
     default_response_for_general_chat,
     default_response_for_feature_not_added,
@@ -230,10 +232,14 @@ class ChatbotOrchestrator:
         """Extracts key skills and experience from the resume"""
         self.resume_parser.parse_resume(resume)
         resume_dict = self.resume_parser.extract_resume_details()
-        self.vector_storage.collection_name = "resumes_extracted"
-        self.vector_storage.create_collection()
+        resume_collection_name = "resumes_extracted"
+        self.vector_storage.create_collection(
+            collection_name=resume_collection_name, create_indexes=False
+        )
         self.vector_storage.upload_points(
-            points=[resume_dict], key_to_encode="RAW_TEXT"
+            points=[resume_dict],
+            key_to_encode="RAW_TEXT",
+            collection_name=resume_collection_name,
         )
 
     def handle_resume_queries(
@@ -246,6 +252,12 @@ class ChatbotOrchestrator:
             return default_response_for_resume_not_uploaded
         if EnumeratedQueryType(query_type) == EnumeratedQueryType.JOB_GAP_ANALYSIS:
             return self.job_gap_analysis(user_query=user_query)
+        if (
+            EnumeratedQueryType(query_type)
+            == EnumeratedQueryType.SUGGEST_JOBS_BY_RESUME
+        ):
+
+            return "WIP"
         self.summarise_user_query(
             user_query="computer response: The user previously requested a resume-related feature, "
             "but it has not been implemented yet."
@@ -265,9 +277,11 @@ class ChatbotOrchestrator:
             job_description = (
                 self.vector_storage.retrieve_docs_based_on_keyword_filters(
                     keyword_filters=job_key_details,
+                    limit=1,
+                    collection_name="parsed_job.topic",
                 )
             )
-            gap_analysis = self.gap_analysis_by_job(job_description=job_description)
+            gap_analysis = self.llm_gap_analysis(job_description=job_description)
             self.summarise_user_query(
                 user_query=f"computer response: The user requested a gap analysis of {job_key_details} "
                 "against their resume. The gap analysis was evaluated and shown to the user."
@@ -279,7 +293,7 @@ class ChatbotOrchestrator:
         )
         return default_response_for_gap_analysis
 
-    def gap_analysis_by_job(
+    def llm_gap_analysis(
         self,
         job_description: str,
     ) -> str:
@@ -292,3 +306,12 @@ class ChatbotOrchestrator:
             user_prompt=user_prompt,
             response_type="text",
         )
+
+    def suggest_jobs_by_resume(self):
+        top_n_jobs = self.vector_storage.retrieve_docs_based_on_query(
+            query=self.resume_parser.resume_in_text, collection_name=PARSED_JOB_TOPIC
+        )
+        for job in top_n_jobs:
+            url = job["url"]
+            job_position = job["job_position"]
+            suburb = job["suburb"]

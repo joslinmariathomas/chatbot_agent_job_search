@@ -22,3 +22,4 @@ asyncio
 docling
 kafka-python
 confluent-kafka
+fastembed

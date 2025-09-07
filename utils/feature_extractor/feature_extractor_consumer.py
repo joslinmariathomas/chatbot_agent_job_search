@@ -36,8 +36,9 @@ class FeatureExtractorProcessor(AbstractMessageProcessor):
         self,
         job_listings: list[dict],
     ):
-        self.vector_storage.collection_name = self.topic_name
-        self.vector_storage.create_collection()
+        self.vector_storage.create_collection(collection_name=self.topic_name)
         self.vector_storage.upload_points(
-            points=job_listings, key_to_encode="description"
+            points=job_listings,
+            key_to_encode="description",
+            collection_name=self.topic_name,
         )

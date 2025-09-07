@@ -19,7 +19,7 @@ def display_jobs_interactive(jobs_list: list[dict]):
     }
     display_df = pd.DataFrame(display_data)
 
-    st.markdown("### Job Opportunities")
+    st.markdown("#### Job Opportunities")
 
     # Use data_editor with link column
     st.data_editor(
